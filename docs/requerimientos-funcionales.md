@@ -142,7 +142,7 @@ Calculado con `FECHA_REFERENCIA = 2026-09-03`.
 | `co-industrias-delta` | 17 | 0 | 0 | `formulario.xlsx` | **true** | — |
 | `ec-corp-andina` | 13 | 1 · `RUC` (RN1) | 1 · `Número de contribuyente especial` | `formulario.pdf` | **false** | `certificado_cumplimiento_tributario` **ausente** |
 | `hn-agroexport-sula` | 9 | 1 · `RTN` (RN1) | 1 · `Referencias comerciales` | `formulario.xlsx` | **false** | `parafiscales` **vencido** (2026-08-31) |
-| `pa-logistica-istmo` | 8 | 1 · `RUC` (RN1) | 0 | `valores-portal.md` | **false** | formato no soportado |
+| `pa-logistica-istmo` | 8 | 1 · `RUC` (RN1) | 0 | `valores-portal.md` | **true** | sus dos soportes están vigentes; lo que falla es el formato, no el paquete |
 
 > El campo con `requiere_confirmacion` **sí lleva valor** (RN1 lo exige), por eso no se cuenta en `llenos`.
 > Estos números son la aserción de los tests unitarios y del verificador automático de rúbrica.

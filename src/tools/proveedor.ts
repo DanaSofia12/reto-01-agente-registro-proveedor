@@ -69,8 +69,13 @@ function blindar(
   return async (ctx: ContextoHerramienta): Promise<string> => {
     try {
       const { salida, caso, resumen } = await ejecutar(ctx)
-      const esError = salida.includes('"ok":false')
-      registrar(ctx.directory, caso, entrada(nombre, !esError, resumen))
+      let ok = true
+      try {
+        ok = (JSON.parse(salida) as { ok?: boolean }).ok !== false
+      } catch {
+        ok = false
+      }
+      registrar(ctx.directory, caso, entrada(nombre, ok, resumen))
       return salida
     } catch (causa) {
       const error = mensajeDe(causa)
@@ -89,31 +94,51 @@ function blindar(
  *
  * Decisión: el mapeo NO viaja por el modelo entre herramientas. Recalcularlo es
  * determinista y barato, y evita que los valores pasen por el contexto del LLM
- * —que es justo lo que CA2 busca impedir—. Ver SOLUCION.md, decisión 2.
+ * —que es justo lo que CA2 busca impedir—. Ver SOLUCION.md, decisión 1.
  */
 interface EstadoCaso {
   solicitud: Solicitud
-  mapeo: Mapeo
+  /** `null` si la plantilla no se pudo leer. El resto del caso sigue sirviendo. */
+  mapeo: Mapeo | null
+  errorMapeo: string | null
   checklist: Checklist
 }
 
+/**
+ * HU-5 — El mapeo se resuelve aparte y puede fallar solo.
+ *
+ * `armar_paquete` no necesita la plantilla para nada: el checklist sale de
+ * `soportes-exigidos.json` y del índice de soportes. Si la plantilla está
+ * corrupta, el paquete y el checklist se siguen produciendo — que es lo que
+ * pide el criterio "el proceso continúa con lo que sí puede hacer".
+ */
 function resolverCaso(ctx: ContextoHerramienta, caso: string): EstadoCaso {
   const solicitud = leerSolicitud(ctx.directory, caso)
-  const campos = leerCampos(ctx.directory, solicitud, caso)
-  const mapeo = mapearCampos({
-    campos,
-    maestro: leerMaestro(ctx.directory),
-    glosario: leerGlosario(ctx.directory),
-    pais: solicitud.pais,
-  })
+
+  let mapeo: Mapeo | null = null
+  let errorMapeo: string | null = null
+  try {
+    mapeo = mapearCampos({
+      campos: leerCampos(ctx.directory, solicitud, caso),
+      maestro: leerMaestro(ctx.directory),
+      glosario: leerGlosario(ctx.directory),
+      pais: solicitud.pais,
+    })
+  } catch (causa) {
+    errorMapeo = mensajeDe(causa)
+  }
+
   const checklist = construirChecklist({
     soportesExigidos: leerSoportesExigidos(ctx.directory, caso),
     indice: leerIndiceSoportes(ctx.directory),
-    camposFaltantes: mapeo.faltantes.map((c) => c.etiqueta),
+    camposFaltantes: mapeo?.faltantes.map((c) => c.etiqueta) ?? [],
     fechaReferencia: ctx.fechaReferencia,
   })
-  return { solicitud, mapeo, checklist }
+
+  return { solicitud, mapeo, errorMapeo, checklist }
 }
+
+const MAPEO_VACIO: Mapeo = { llenos: [], faltantes: [], requiere_confirmacion: [] }
 
 // ─── proveedor_leer_solicitud ─────────────────────────────────────────────────
 
@@ -162,7 +187,16 @@ export const mapear_campos = {
   },
   execute: (args: { caso: string; campos?: string[] }, ctx: ContextoHerramienta): Promise<string> =>
     blindar("proveedor_mapear_campos", async () => {
-      const { solicitud, mapeo } = resolverCaso(ctx, args.caso)
+      const { solicitud, mapeo, errorMapeo } = resolverCaso(ctx, args.caso)
+      if (mapeo === null) {
+        return {
+          caso: args.caso,
+          resumen: errorMapeo ?? "no se pudo leer la plantilla",
+          salida: fallo(
+            `${errorMapeo ?? "no se pudo leer la plantilla"}. Sin la plantilla no se sabe qué campos pide el cliente, pero el checklist de soportes sí se puede armar con proveedor_armar_paquete.`,
+          ),
+        }
+      }
 
       const pedidas = args.campos
       const filtrar = <T extends { etiqueta: string }>(xs: readonly T[]): readonly T[] =>
@@ -209,7 +243,16 @@ export const generar_formulario = {
   },
   execute: (args: { caso: string }, ctx: ContextoHerramienta): Promise<string> =>
     blindar("proveedor_generar_formulario", async () => {
-      const { solicitud, mapeo, checklist } = resolverCaso(ctx, args.caso)
+      const { solicitud, mapeo, errorMapeo, checklist } = resolverCaso(ctx, args.caso)
+      if (mapeo === null) {
+        return {
+          caso: args.caso,
+          resumen: errorMapeo ?? "no se pudo leer la plantilla",
+          salida: fallo(
+            `${errorMapeo ?? "no se pudo leer la plantilla"}. Sin ella no se puede generar el formulario; el paquete de soportes sí.`,
+          ),
+        }
+      }
       const ordenados = camposOrdenados(mapeo)
 
       if (solicitud.formato === "portal") {
@@ -255,7 +298,7 @@ export const armar_paquete = {
   args: { caso: casoArg },
   execute: (args: { caso: string }, ctx: ContextoHerramienta): Promise<string> =>
     blindar("proveedor_armar_paquete", async () => {
-      const { solicitud, mapeo, checklist } = resolverCaso(ctx, args.caso)
+      const { solicitud, mapeo, errorMapeo, checklist } = resolverCaso(ctx, args.caso)
       const base = `${args.caso}/paquete`
 
       // El formulario, si ya se generó. El paquete no falla por no tenerlo.
@@ -293,7 +336,7 @@ export const armar_paquete = {
       escribirTexto(
         ctx.directory,
         `${base}/borrador-correo.md`,
-        borradorCorreoMd(solicitud, mapeo, checklist),
+        borradorCorreoMd(solicitud, mapeo ?? MAPEO_VACIO, checklist),
       )
 
       const bloqueos = checklist.items.filter((i) => i.bloquea)
@@ -318,6 +361,8 @@ export const armar_paquete = {
           })),
           campos_faltantes: checklist.camposFaltantes,
           fecha_referencia: checklist.fechaReferencia,
+          // HU-5: el paquete se arma igual, y se dice qué no se pudo hacer.
+          advertencia: errorMapeo,
         }),
       }
     })(ctx),

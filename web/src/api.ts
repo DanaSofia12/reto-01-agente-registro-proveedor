@@ -58,11 +58,19 @@ export function obtenerCasos(): Promise<{ casos: ResumenCaso[] }> {
   return pedir<{ casos: ResumenCaso[] }>("/api/casos")
 }
 
-export function enviarMensaje(sessionId: string | null, message: string): Promise<RespuestaChat> {
+/**
+ * `confirmacion` es el canal fiable de CA3: el botón lo manda explícitamente
+ * en vez de confiar en que el servidor interprete bien el texto libre.
+ */
+export function enviarMensaje(
+  sessionId: string | null,
+  message: string,
+  confirmacion = false,
+): Promise<RespuestaChat> {
   return pedir<RespuestaChat>("/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sessionId, message }),
+    body: JSON.stringify({ sessionId, message, confirmacion }),
   })
 }
 

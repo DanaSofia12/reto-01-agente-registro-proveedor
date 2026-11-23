@@ -24,7 +24,7 @@ import {
  * Implementado a mano en vez de con el tool runner del SDK: el reto evalúa
  * explícitamente el bucle, el tope de iteraciones y la confirmación humana, y
  * exige poder explicar cada línea. Delegar eso a una abstracción del SDK
- * regalaría justo lo que se califica. Ver SOLUCION.md, decisión 3.
+ * regalaría justo lo que se califica. Ver SOLUCION.md, decisión 2.
  */
 
 const HERRAMIENTAS_LLM: readonly HerramientaLLM[] = HERRAMIENTAS.map((h) => ({
@@ -95,7 +95,11 @@ function resumirResultado(crudo: string): { ok: boolean; resumen: string; datos:
 export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
   const sistema = cargarSistema(raiz)
 
-  return async function ejecutarTurno(sesion: Sesion, mensaje: string): Promise<ResultadoTurno> {
+  return async function ejecutarTurno(
+    sesion: Sesion,
+    mensaje: string,
+    confirmacionExplicita = false,
+  ): Promise<ResultadoTurno> {
     const ctx: ContextoHerramienta = {
       directory: raiz,
       sessionId: sesion.id,
@@ -104,8 +108,10 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
 
     // La confirmación se evalúa UNA vez, contra el mensaje que acaba de llegar,
     // antes de que el modelo tenga ocasión de interpretarlo a su manera.
+    // Dos canales: el botón del front manda `confirmacion: true` de forma
+    // inequívoca; el texto libre solo confirma si no deja lugar a duda.
     const pendiente = sesion.pendiente
-    const confirmadoAhora = pendiente !== null && esConfirmacion(mensaje)
+    const confirmadoAhora = pendiente !== null && (confirmacionExplicita || esConfirmacion(mensaje))
     sesion.pendiente = null
 
     sesion.mensajes.push({ rol: "usuario", texto: mensaje })
@@ -206,7 +212,12 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
       ].join("")
     }
 
-    sesion.pendiente = nuevaPendiente
+    // CA3 condiciona el resaltado a que el agente TERMINE el turno con una
+    // pregunta. Si no preguntó —por ejemplo porque la analista dijo "no envíes
+    // nada todavía"— no hay nada que confirmar y el front no debe insistir.
+    const preguntó = respuestaFinal.includes("?") || respuestaFinal.includes("¿")
+    sesion.pendiente = preguntó ? nuevaPendiente : null
+
     sesion.historial.push({
       rol: "agente",
       texto: respuestaFinal,
@@ -217,7 +228,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     return {
       reply: respuestaFinal,
       toolCalls: llamadasDelTurno,
-      needsConfirmation: nuevaPendiente !== null,
+      needsConfirmation: sesion.pendiente !== null,
       sessionId: sesion.id,
       uso: {
         tokensEntrada: sesion.uso.tokensEntrada,

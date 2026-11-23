@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import type { ContextoHerramienta } from "../src/domain/tipos.ts"
 import { limpiarSalida } from "../src/infra/salida.ts"
@@ -238,5 +238,39 @@ describe("RN5 / CA4 — bitácora", () => {
     expect(ultima).toHaveProperty("herramienta")
     expect(ultima).toHaveProperty("ok")
     expect(ultima).toHaveProperty("resumen")
+  })
+})
+
+describe("HU-5 — el proceso continúa con lo que sí puede hacer", () => {
+  const CASO = "ec-corp-andina"
+  const PLANTILLA = path.join(RAIZ, `fixtures/reto-01/casos/${CASO}/plantilla-campos.json`)
+  let original = ""
+
+  beforeAll(() => {
+    original = readFileSync(PLANTILLA, "utf8")
+  })
+
+  afterAll(() => {
+    if (original !== "") writeFileSync(PLANTILLA, original, "utf8")
+  })
+
+  test("con la plantilla corrupta, armar_paquete sigue produciendo el checklist", async () => {
+    writeFileSync(PLANTILLA, "{ esto no es json", "utf8")
+
+    const mapeo = await invocar("proveedor_mapear_campos", { caso: CASO })
+    expect(mapeo.ok).toBe(false)
+    expect(mapeo.error).toContain("no es JSON válido")
+    // Mensaje útil, sin traza cruda.
+    expect(mapeo.error).not.toContain("    at ")
+
+    // La plantilla no hace falta para el checklist de soportes.
+    const paquete = await invocar("proveedor_armar_paquete", { caso: CASO })
+    expect(paquete.ok).toBe(true)
+    expect(paquete.data?.listo_para_firma).toBe(false)
+    expect(lista(paquete.data, "checklist").length).toBe(5)
+    expect(paquete.data?.advertencia).toContain("no es JSON válido")
+    expect(existsSync(path.join(RAIZ, `out/${CASO}/paquete/checklist.md`))).toBe(true)
+
+    writeFileSync(PLANTILLA, original, "utf8")
   })
 })

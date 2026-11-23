@@ -22,8 +22,8 @@ beforeEach(() => limpiarSalida(RAIZ))
 afterAll(() => limpiarSalida(RAIZ))
 
 describe("esConfirmacion", () => {
-  test("acepta confirmaciones inequívocas", () => {
-    for (const texto of ["sí", "Confirmo", "envía", "dale, procede", "Ok, hazlo", "autorizo"]) {
+  test("acepta solo lo que confirma la acción, no un asentimiento suelto", () => {
+    for (const texto of ["Confirmo", "dale, procede", "Ok, hazlo", "autorizo", "envíalo"]) {
       expect(esConfirmacion(texto), texto).toBe(true)
     }
   })
@@ -227,5 +227,117 @@ describe("CA5 — un error de herramienta no mata la sesión", () => {
 
     expect(resultado.toolCalls[0]?.ok).toBe(false)
     expect(resultado.toolCalls[0]?.resumen).toContain("desconocida")
+  })
+})
+
+describe("regresión — el gate no se abre con un asentimiento genérico", () => {
+  /**
+   * Antes de corregirlo, `esConfirmacion` buscaba palabras sueltas y "ok,
+   * gracias" autorizaba un envío. En producción "ese archivo" es un correo.
+   */
+  const noConfirman = [
+    "ok, gracias",
+    "ya quedó listo el checklist?",
+    "listo, dame el checklist",
+    "sí, pero antes revisa el checklist",
+    "dale, muéstrame los faltantes",
+    "sí",
+    "ok",
+    "dale",
+    "¿confirmo?",
+    "perfecto, gracias",
+  ]
+  for (const texto of noConfirman) {
+    test(`"${texto}" no autoriza`, () => {
+      expect(esConfirmacion(texto)).toBe(false)
+    })
+  }
+
+  /** `para` estaba en la lista de negaciones: bloqueaba una confirmación real. */
+  const siConfirman = [
+    "Sí, confirmo. Prepara el envío simulado.",
+    "confirmo el envío para el cliente",
+    "adelante",
+    "autorizo el envío",
+    "hazlo",
+    "procede",
+    "envíalo",
+  ]
+  for (const texto of siConfirman) {
+    test(`"${texto}" autoriza`, () => {
+      expect(esConfirmacion(texto)).toBe(true)
+    })
+  }
+
+  test("el botón del front confirma sin depender del texto", async () => {
+    const sesion = crearSesion("boton")
+
+    const turno1 = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          { nombre: "proveedor_armar_paquete", argumentos: { caso: "co-industrias-delta" } },
+        ],
+      },
+      { texto: "Listo. ¿Preparo el envío simulado?", llamadas: [] },
+    ])
+    await turno1(sesion, "procesa co-industrias-delta")
+
+    const turno2 = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          {
+            nombre: "proveedor_simular_envio",
+            argumentos: { caso: "co-industrias-delta", confirmado: true },
+          },
+        ],
+      },
+      { texto: "Preparado.", llamadas: [] },
+    ])
+    // Texto que por sí solo NO confirmaría, pero el botón marca confirmacion=true.
+    const resultado = await turno2(sesion, "ok", true)
+
+    expect(resultado.toolCalls[0]?.ok).toBe(true)
+    expect(existsSync(path.join(RAIZ, "out/co-industrias-delta/ENVIO-SIMULADO.md"))).toBe(true)
+  })
+})
+
+describe("CA3 — no se resalta confirmación si el agente no preguntó", () => {
+  test("con 'no envíes nada todavía' el turno no queda pendiente", async () => {
+    const ejecutar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          { nombre: "proveedor_armar_paquete", argumentos: { caso: "co-industrias-delta" } },
+        ],
+      },
+      { texto: "El paquete quedó listo para firma. No envié nada.", llamadas: [] },
+    ])
+
+    const sesion = crearSesion("sin-pregunta")
+    const resultado = await ejecutar(sesion, "procesa co-industrias-delta, no envíes nada todavía")
+
+    expect(resultado.needsConfirmation).toBe(false)
+    expect(sesion.pendiente).toBeNull()
+  })
+})
+
+describe("CA4 — las llamadas rechazadas por validación también se registran", () => {
+  test("un argumento inválido deja línea en out/log.jsonl", async () => {
+    const ejecutar = ciclo([
+      {
+        texto: "",
+        llamadas: [{ nombre: "proveedor_leer_solicitud", argumentos: { caso: 42 } }],
+      },
+      { texto: "El argumento del caso no era un texto.", llamadas: [] },
+    ])
+
+    const sesion = crearSesion("validacion")
+    const resultado = await ejecutar(sesion, "lee el caso 42")
+
+    expect(resultado.toolCalls[0]?.ok).toBe(false)
+    expect(resultado.toolCalls[0]?.resumen).toContain("argumentos inválidos")
+    expect(existsSync(path.join(RAIZ, "out/log.jsonl"))).toBe(true)
   })
 })

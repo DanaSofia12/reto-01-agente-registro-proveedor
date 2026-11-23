@@ -29,7 +29,7 @@ docker build -t agente-proveedor .
 docker run -p 3000:3000 -e ANTHROPIC_API_KEY=... agente-proveedor
 ```
 
-> Requiere [Bun](https://bun.sh) 1.4 o superior. Con Node 20+ también funciona, pero los scripts usan `bun`.
+> Requiere [Bun](https://bun.sh) 1.4 o superior. No es opcional: el servidor usa `Bun.serve`, `Bun.file` y `Bun.Glob`, y los tests usan `bun:test`.
 
 ---
 
@@ -59,7 +59,7 @@ Los artefactos quedan en `out/`.
 | Comando | Qué hace |
 |---|---|
 | `bun test` | 57 tests: dominio, contrato de herramientas y ciclo del agente |
-| `bun run verificar` | Recorre los 35 criterios verificables de la rúbrica |
+| `bun run verificar` | Recorre los criterios automatizables de la rúbrica |
 | `bun run typecheck` | TypeScript estricto, sin `any` |
 | `bun run lint` | Biome: lint y formato |
 | `bun run modulo` | Regenera `modulo/` desde las fuentes reales |
@@ -80,7 +80,7 @@ Todas en `.env.example`. **La clave del modelo solo vive en el entorno del backe
 | `MAX_TOKENS_SESION` | `200000` | Tope acumulado: nadie gasta la clave sin límite |
 | `MAX_TOKENS_RESPUESTA` | `16000` | Cubre thinking + texto en una respuesta |
 | `LLM_TIMEOUT_MS` | `60000` | Timeout al proveedor |
-| `FECHA_REFERENCIA` | `2026-09-03` | Fecha contra la que se evalúan las vigencias |
+| `FECHA_REFERENCIA` | sin valor → hoy | Fecha contra la que se evalúan las vigencias |
 | `PORT` | `3000` | — |
 
 ### Sobre `FECHA_REFERENCIA`

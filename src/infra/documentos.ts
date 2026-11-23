@@ -159,7 +159,11 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
   lineas.push("")
 
   // RN2 — ni el valor ni la etiqueta de un campo bancario entran en el correo.
-  const confirmar = mapeo.requiere_confirmacion.filter((c) => !esBancario(c.origen))
+  // Solo los que de verdad llevan valor: un cruce dudoso quedó vacío y
+  // afirmar que se diligenció sería falso en un correo al cliente.
+  const confirmar = mapeo.requiere_confirmacion.filter(
+    (c) => !esBancario(c.origen) && c.valor !== null,
+  )
   if (confirmar.length > 0) {
     lineas.push(
       "Sobre algunos campos del formato:",
@@ -172,12 +176,12 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
     )
   }
 
-  const faltantesNoBancarios = mapeo.faltantes.filter((c) => c.obligatorio === true)
-  if (faltantesNoBancarios.length > 0) {
+  const faltantesObligatorios = mapeo.faltantes.filter((c) => c.obligatorio === true)
+  if (faltantesObligatorios.length > 0) {
     lineas.push(
       "Los siguientes campos obligatorios quedaron pendientes porque no aplican a nuestra constitución o no contamos con el dato:",
       "",
-      ...faltantesNoBancarios.map((c) => `- ${c.etiqueta}`),
+      ...faltantesObligatorios.map((c) => `- ${c.etiqueta}`),
       "",
       "Quedamos atentos a si podemos omitirlos o si requieren una alternativa.",
       "",
@@ -206,7 +210,7 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
 
 export function valoresPortalMd(solicitud: Solicitud, mapeo: Mapeo, checklist: Checklist): string {
   const ordenados = campos(mapeo)
-  const urlEnCuerpo = solicitud.cuerpo.match(/https?:\/\/\S+/)
+  const urlEnCuerpo = solicitud.cuerpo.match(/https?:\/\/[^\s.,;)]+(?:[.,;][^\s.,;)]+)*/)
   const lineas = [
     `# ${solicitud.cliente} — portal`,
     "",
@@ -250,7 +254,7 @@ export function valoresPortalMd(solicitud: Solicitud, mapeo: Mapeo, checklist: C
         ? item.vigenciaHasta === null
           ? "sin vencimiento"
           : `vigente hasta ${item.vigenciaHasta}`
-        : ETIQUETA_ESTADO[item.estado]
+        : (ETIQUETA_ESTADO[item.estado] ?? item.estado)
     lineas.push(`| ${item.tipo.replace(/_/g, " ")} | ${archivo} | ${estado} |`)
   }
   lineas.push("")

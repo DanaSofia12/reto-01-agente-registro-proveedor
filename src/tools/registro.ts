@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { ContextoHerramienta } from "../domain/tipos.ts"
+import { entrada, registrar as registrarEnBitacora } from "../infra/bitacora.ts"
 import * as proveedor from "./proveedor.ts"
 
 /**
@@ -57,10 +58,14 @@ function registrar(archivo: string, modulo: Record<string, unknown>): Herramient
           const detalle = validados.error.issues
             .map((i) => `${i.path.join(".") || "argumentos"}: ${i.message}`)
             .join("; ")
-          return JSON.stringify({
-            ok: false,
-            error: `argumentos inválidos para ${nombre} — ${detalle}`,
-          })
+          const error = `argumentos inválidos para ${nombre} — ${detalle}`
+          // CA4 dice "toda llamada": una rechazada por zod también se registra.
+          try {
+            registrarEnBitacora(ctx.directory, null, entrada(nombre, false, error))
+          } catch {
+            // La bitácora es best-effort; el error del modelo es lo importante.
+          }
+          return JSON.stringify({ ok: false, error })
         }
         return valor.execute(validados.data as never, ctx)
       },

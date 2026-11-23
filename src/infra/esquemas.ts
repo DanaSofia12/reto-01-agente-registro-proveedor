@@ -11,7 +11,8 @@ export const FormatoSchema = z.enum(["xlsx", "pdf", "portal"])
 export const SolicitudSchema = z.object({
   id: z.string(),
   de: z.string(),
-  para: z.string(),
+  // §7.1 del PRD no lo lista; los fixtures sí lo traen.
+  para: z.string().default(""),
   asunto: z.string(),
   fecha: z.string(),
   pais: PaisSchema,

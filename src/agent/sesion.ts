@@ -78,11 +78,23 @@ export function tokensConsumidos(sesion: Sesion): number {
 
 // ─── Detección de confirmación ────────────────────────────────────────────────
 
-const NEGACIONES =
-  /\b(no|nunca|jamas|todavia no|aun no|espera|cancela|cancelar|detente|para|mejor no|aun no)\b/
+/**
+ * Una partícula afirmativa suelta NO autoriza nada. "ok, gracias" contiene
+ * "ok" y no confirma ningún envío. Hace falta un verbo que confirme **la
+ * acción**, no solo un asentimiento.
+ */
+const VERBOS_CONFIRMACION =
+  /\b(confirmo|confirmado|confirmalo|confirma el|autorizo|autorizado|apruebo|aprobado|procede|proceder|adelante|hazlo|envialo|mandalo|envia el|envia ya|enviar el)\b/
 
-const AFIRMACIONES =
-  /\b(si|confirmo|confirmado|confirma|envia|enviar|envialo|adelante|procede|proceder|dale|ok|okay|hazlo|correcto|de acuerdo|listo|aprobado|autorizo)\b/
+const NEGACIONES =
+  /\b(no|nunca|jamas|todavia|aun|espera|esperar|cancela|cancelar|anula|detente|detener|frena|alto|mejor no|aun no)\b/
+
+/**
+ * Matices que convierten un "sí" en un "sí, pero". Cualquiera de ellos
+ * descalifica el mensaje como confirmación inequívoca.
+ */
+const MATICES =
+  /\b(pero|antes|primero|aunque|salvo|excepto|solo si|unicamente si|despues|luego|revisa|revisar|verifica|verificar|muestra|muestrame|dame|explica)\b/
 
 function normalizar(texto: string): string {
   return texto
@@ -95,14 +107,24 @@ function normalizar(texto: string): string {
 }
 
 /**
- * ¿El mensaje confirma de forma inequívoca?
+ * ¿El mensaje confirma la acción externa de forma inequívoca?
  *
- * Conservadora a propósito: la ambigüedad no es confirmación. Se comprueba la
- * negación primero, porque "no envíes" contiene "envíes".
+ * Conservadora a propósito: **la ambigüedad nunca es confirmación**. Se
+ * descarta en cascada —pregunta, negación, matiz— y solo entonces se exige un
+ * verbo que confirme explícitamente. Un asentimiento genérico no basta.
+ *
+ * Esta función es la red secundaria. El canal fiable es el botón del front,
+ * que manda `confirmacion: true`; el texto libre solo confirma cuando no deja
+ * lugar a duda.
  */
 export function esConfirmacion(texto: string): boolean {
+  // Una pregunta nunca es una orden, aunque empiece por "sí".
+  if (texto.includes("?") || texto.includes("¿")) return false
+
   const limpio = normalizar(texto)
   if (limpio === "") return false
   if (NEGACIONES.test(limpio)) return false
-  return AFIRMACIONES.test(limpio)
+  if (MATICES.test(limpio)) return false
+
+  return VERBOS_CONFIRMACION.test(limpio)
 }

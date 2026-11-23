@@ -58,6 +58,7 @@ export function App() {
   const [casos, setCasos] = useState<ResumenCaso[]>([])
   const [casoActual, setCasoActual] = useState<string | null>(null)
   const [artefactos, setArtefactos] = useState<string[]>([])
+  const [ultimaIteracion, setUltimaIteracion] = useState<number | null>(null)
 
   const finRef = useRef<HTMLDivElement>(null)
   const entradaRef = useRef<HTMLTextAreaElement>(null)
@@ -78,7 +79,7 @@ export function App() {
   const todasLasLlamadas = turnos.flatMap((t) => t.llamadas)
 
   const enviar = useCallback(
-    async (texto: string) => {
+    async (texto: string, confirmacion = false) => {
       const limpio = texto.trim()
       if (limpio === "" || pensando) return
 
@@ -91,9 +92,10 @@ export function App() {
       ])
 
       try {
-        const respuesta = await enviarMensaje(sessionId, limpio)
+        const respuesta = await enviarMensaje(sessionId, limpio, confirmacion)
         setSessionId(respuesta.sessionId)
         setNecesitaConfirmacion(respuesta.needsConfirmation)
+        setUltimaIteracion(respuesta.iteraciones ?? null)
         setTurnos((previos) => [
           ...previos,
           {
@@ -205,7 +207,9 @@ export function App() {
                 </article>
               ))}
 
-              {pensando && <Pensando iteracion={null} tope={salud?.maxIteracionesTurno ?? 25} />}
+              {pensando && (
+                <Pensando iteracion={ultimaIteracion} tope={salud?.maxIteracionesTurno ?? 25} />
+              )}
 
               {necesitaConfirmacion && !pensando && (
                 <BloqueConfirmacion

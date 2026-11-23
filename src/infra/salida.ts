@@ -36,8 +36,6 @@ export function copiarA(directory: string, origen: string, relativa: string): st
 export function anexarLinea(directory: string, relativa: string, linea: string): void {
   const destino = rutaSalida(directory, relativa)
   asegurarDirectorio(destino)
-  const previo = existsSync(destino) ? "" : ""
-  writeFileSync(destino, previo, { flag: "a" })
   writeFileSync(destino, `${linea}\n`, { flag: "a" })
 }
 

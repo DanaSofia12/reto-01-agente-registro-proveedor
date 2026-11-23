@@ -38,7 +38,13 @@ try {
 
 // ─── Utilidades HTTP ──────────────────────────────────────────────────────────
 
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" }
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+}
+
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", ...CORS }
 
 function json(cuerpo: unknown, estado = 200): Response {
   return new Response(JSON.stringify(cuerpo), { status: estado, headers: JSON_HEADERS })
@@ -48,23 +54,45 @@ function error(mensaje: string, estado: number): Response {
   return json({ ok: false, error: mensaje }, estado)
 }
 
-/** Rate limit por sesión: el link es público y la clave es nuestra (NFR Costo). */
+/**
+ * Rate limit por ORIGEN, no por sesión (NFR Costo).
+ *
+ * El `sessionId` lo elige el cliente: limitar por él se evade rotándolo en
+ * cada petición, que es justo lo que hace un abusador. El link es público y la
+ * clave es nuestra, así que la cuota se cuenta por IP.
+ */
 const VENTANA_MS = 60_000
 const MAX_POR_VENTANA = 20
 const golpes = new Map<string, number[]>()
 
-function excedeLimite(clave: string): boolean {
+/** Detrás de Fly o cualquier proxy, la IP real viene en la cabecera. */
+function origenDe(peticion: Request, servidor: Bun.Server<undefined>): string {
+  const reenviada = peticion.headers.get("x-forwarded-for")
+  if (reenviada !== null && reenviada !== "") {
+    return (reenviada.split(",")[0] ?? "").trim() || "desconocido"
+  }
+  return servidor.requestIP(peticion)?.address ?? "desconocido"
+}
+
+function excedeLimite(origen: string): boolean {
   const ahora = Date.now()
-  const previos = (golpes.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS)
+  const previos = (golpes.get(origen) ?? []).filter((t) => ahora - t < VENTANA_MS)
   previos.push(ahora)
-  golpes.set(clave, previos)
+  golpes.set(origen, previos)
+
+  // Purga de orígenes inactivos: el Map no puede crecer sin cota.
+  if (golpes.size > 5_000) {
+    for (const [clave, marcas] of golpes) {
+      if (marcas.every((t) => ahora - t >= VENTANA_MS)) golpes.delete(clave)
+    }
+  }
   return previos.length > MAX_POR_VENTANA
 }
 
 // ─── Rutas ────────────────────────────────────────────────────────────────────
 
-async function postChat(peticion: Request): Promise<Response> {
-  let cuerpo: { sessionId?: string; message?: string }
+async function postChat(peticion: Request, servidor: Bun.Server<undefined>): Promise<Response> {
+  let cuerpo: { sessionId?: string; message?: string; confirmacion?: boolean }
   try {
     cuerpo = (await peticion.json()) as typeof cuerpo
   } catch {
@@ -75,15 +103,16 @@ async function postChat(peticion: Request): Promise<Response> {
   if (mensaje === "") return error("falta el campo message", 400)
   if (mensaje.length > 4000) return error("el mensaje es demasiado largo", 413)
 
-  const sesion = obtenerOCrearSesion(cuerpo.sessionId)
-  if (excedeLimite(sesion.id)) {
+  if (excedeLimite(origenDe(peticion, servidor))) {
     return error("demasiados mensajes seguidos. Espera un momento antes de continuar", 429)
   }
+
+  const sesion = obtenerOCrearSesion(cuerpo.sessionId)
 
   if (cicloListo === null) {
     return json(
       {
-        reply: `${motivoSinCiclo ?? "el proveedor de modelo no está configurado"}. Mientras tanto puedes verificar las herramientas sin modelo con \`bun run demo.ts\`.`,
+        reply: `${(motivoSinCiclo ?? "el proveedor de modelo no está configurado").replace(/\.$/, "")}. Mientras tanto puedes verificar las herramientas sin modelo con \`bun run demo.ts\`.`,
         toolCalls: [],
         needsConfirmation: false,
         sessionId: sesion.id,
@@ -93,7 +122,7 @@ async function postChat(peticion: Request): Promise<Response> {
   }
 
   try {
-    return json(await cicloListo(sesion, mensaje))
+    return json(await cicloListo(sesion, mensaje, cuerpo.confirmacion === true))
   } catch (causa) {
     // Última red: ni un fallo inesperado mata la sesión (CA5).
     const texto = causa instanceof Error ? causa.message : "error inesperado en el ciclo del agente"
@@ -201,32 +230,27 @@ const servidor = Bun.serve({
   port: config.PORT,
   idleTimeout: 120,
 
-  async fetch(peticion) {
+  async fetch(peticion, servidor) {
     const url = new URL(peticion.url)
     const ruta = url.pathname
 
     if (peticion.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "access-control-allow-origin": "*",
-          "access-control-allow-methods": "GET, POST, OPTIONS",
-          "access-control-allow-headers": "content-type",
-        },
-      })
+      return new Response(null, { status: 204, headers: CORS })
     }
 
-    if (ruta === "/api/health") return getSalud()
-    if (ruta === "/api/casos") return getCasos()
-    if (ruta === "/api/chat" && peticion.method === "POST") return postChat(peticion)
+    const esGet = peticion.method === "GET"
 
-    const sesion = ruta.match(/^\/api\/sessions\/([\w-]+)$/)
+    if (ruta === "/api/health" && esGet) return getSalud()
+    if (ruta === "/api/casos" && esGet) return getCasos()
+    if (ruta === "/api/chat" && peticion.method === "POST") return postChat(peticion, servidor)
+
+    const sesion = esGet ? ruta.match(/^\/api\/sessions\/([\w-]+)$/) : null
     if (sesion?.[1] !== undefined) return getSesion(sesion[1])
 
-    const artefactos = ruta.match(/^\/api\/artefactos\/([a-z0-9-]+)$/)
+    const artefactos = esGet ? ruta.match(/^\/api\/artefactos\/([a-z0-9-]+)$/) : null
     if (artefactos?.[1] !== undefined) return getArtefactos(artefactos[1])
 
-    const archivo = ruta.match(/^\/api\/archivos\/([a-z0-9-]+)\/(.+)$/)
+    const archivo = esGet ? ruta.match(/^\/api\/archivos\/([a-z0-9-]+)\/(.+)$/) : null
     if (archivo?.[1] !== undefined && archivo[2] !== undefined) {
       return getArchivo(archivo[1], decodeURIComponent(archivo[2]))
     }

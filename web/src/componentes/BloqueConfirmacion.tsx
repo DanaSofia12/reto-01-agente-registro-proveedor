@@ -11,7 +11,7 @@ export function BloqueConfirmacion({
   deshabilitado,
 }: {
   caso: string | null
-  onResponder: (texto: string) => void
+  onResponder: (texto: string, confirmacion?: boolean) => void
   deshabilitado: boolean
 }) {
   return (
@@ -38,7 +38,7 @@ export function BloqueConfirmacion({
             <button
               type="button"
               disabled={deshabilitado}
-              onClick={() => onResponder("Sí, confirmo. Prepara el envío simulado.")}
+              onClick={() => onResponder("Sí, confirmo. Prepara el envío simulado.", true)}
               className="rounded-md border border-acento bg-acento px-3 py-1.5 text-[13px] text-white transition-colors hover:bg-acento/90 disabled:opacity-50"
             >
               Confirmar envío

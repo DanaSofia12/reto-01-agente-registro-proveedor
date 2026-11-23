@@ -9,7 +9,10 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { esConfirmacion } from "../src/agent/sesion.ts"
+import { mapearCampos } from "../src/domain/mapeo.ts"
 import type { ContextoHerramienta } from "../src/domain/tipos.ts"
+import { leerCampos, leerGlosario, leerMaestro, leerSolicitud } from "../src/infra/fixtures.ts"
 import { limpiarSalida } from "../src/infra/salida.ts"
 import { buscarHerramienta, HERRAMIENTAS } from "../src/tools/registro.ts"
 
@@ -328,6 +331,60 @@ const CRITERIOS: readonly Criterio[] = [
     },
   },
 
+  // ─── D · Confirmación humana ────────────────────────────────────────────────
+  {
+    id: "D2",
+    descripcion: "un asentimiento genérico NO autoriza una acción externa",
+    comprobar: () => {
+      const noDebenConfirmar = [
+        "ok, gracias",
+        "ya quedó listo el checklist?",
+        "listo, dame el checklist",
+        "sí, pero antes revisa el checklist",
+        "sí",
+        "ok",
+        "no envíes nada todavía",
+      ]
+      const siDebenConfirmar = [
+        "Sí, confirmo. Prepara el envío simulado.",
+        "confirmo el envío para el cliente",
+        "adelante",
+        "autorizo el envío",
+      ]
+      return (
+        noDebenConfirmar.every((t) => !esConfirmacion(t)) &&
+        siDebenConfirmar.every((t) => esConfirmacion(t))
+      )
+    },
+  },
+  {
+    id: "D3",
+    descripcion: "CA4: una llamada rechazada por validación queda en la bitácora",
+    comprobar: async () => {
+      limpiarSalida(RAIZ)
+      await invocar("proveedor_leer_solicitud", { caso: 42 })
+      const linea = contenido("out/log.jsonl").trim().split("\n").at(-1) ?? ""
+      if (linea === "") return false
+      const e = JSON.parse(linea) as { ok?: boolean; resumen?: string }
+      return e.ok === false && (e.resumen ?? "").includes("argumentos inválidos")
+    },
+  },
+
+  // ─── E · HU-5 · continuar con lo que sí se puede ────────────────────────────
+  {
+    id: "E1",
+    descripcion: "HU-5: armar_paquete no depende de la plantilla del formulario",
+    comprobar: () => {
+      // La resiliencia se verifica corrompiendo la plantilla en tests/; aquí se
+      // comprueba la propiedad estructural que la hace posible.
+      const fuente = contenido("src/tools/proveedor.ts")
+      return (
+        /mapeo:\s*Mapeo \| null/.test(fuente) &&
+        /camposFaltantes:\s*mapeo\?\.faltantes/.test(fuente)
+      )
+    },
+  },
+
   // ─── F · Arquitectura y NFR ─────────────────────────────────────────────────
   {
     id: "F1",
@@ -357,6 +414,22 @@ const CRITERIOS: readonly Criterio[] = [
     },
   },
   {
+    id: "F7",
+    descripcion: "determinismo: el mapeo es reproducible y demo.ts limpia out/",
+    comprobar: () => {
+      const maestro = leerMaestro(RAIZ)
+      const glosario = leerGlosario(RAIZ)
+      for (const caso of ["co-industrias-delta", "ec-corp-andina", "hn-agroexport-sula"]) {
+        const solicitud = leerSolicitud(RAIZ, caso)
+        const campos = leerCampos(RAIZ, solicitud, caso)
+        const uno = mapearCampos({ campos, maestro, glosario, pais: solicitud.pais })
+        const dos = mapearCampos({ campos, maestro, glosario, pais: solicitud.pais })
+        if (JSON.stringify(uno) !== JSON.stringify(dos)) return false
+      }
+      return /limpiarSalida\(RAIZ\)/.test(contenido("demo.ts"))
+    },
+  },
+  {
     id: "F8",
     descripcion: "no hay 'any' explícito en el código fuente",
     comprobar: async () => {
@@ -365,6 +438,18 @@ const CRITERIOS: readonly Criterio[] = [
         if (/:\s*any\b|<any>|as any/.test(readFileSync(archivo(relativo), "utf8"))) return false
       }
       return true
+    },
+  },
+
+  {
+    id: "F9",
+    descripcion: "NFR Costo: el rate limit no se evade rotando sessionId",
+    comprobar: () => {
+      const fuente = contenido("src/server.ts")
+      return (
+        /excedeLimite\(origenDe\(peticion, servidor\)\)/.test(fuente) &&
+        /x-forwarded-for/.test(fuente)
+      )
     },
   },
 
