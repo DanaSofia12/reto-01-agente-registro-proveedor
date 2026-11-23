@@ -58,7 +58,7 @@ Los artefactos quedan en `out/`.
 
 | Comando | Qué hace |
 |---|---|
-| `bun test` | 57 tests: dominio, contrato de herramientas y ciclo del agente |
+| `bun test` | 78 tests: dominio, contrato de herramientas y ciclo del agente |
 | `bun run verificar` | Recorre los criterios automatizables de la rúbrica |
 | `bun run typecheck` | TypeScript estricto, sin `any` |
 | `bun run lint` | Biome: lint y formato |
