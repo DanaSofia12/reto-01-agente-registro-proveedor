@@ -1,15 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
   "files": {
-    "includes": [
-      "**",
-      "!out/**",
-      "!web/dist/**",
-      "!fixtures/**",
-      "!node_modules/**",
-      "!modulo",
-      "!**/*.css"
-    ]
+    "includes": ["**", "!out", "!web/dist", "!fixtures", "!node_modules", "!modulo", "!**/*.css"]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": {
