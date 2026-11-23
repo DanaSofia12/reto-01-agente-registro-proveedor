@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Dirección visual: expediente.
+ *
+ * El dominio es papeleo corporativo latinoamericano — cámaras de comercio,
+ * RUT, sellos. La superficie es una carpeta de archivo, no una app de consumo.
+ *
+ * Dos reglas que gobiernan todo:
+ *  1. La monoespaciada es señal de procedencia, no decoración: marca lo que
+ *     salió de una herramienta frente a lo que el agente narra.
+ *  2. El color solo marca excepciones. Lo correcto no lleva color; la ausencia
+ *     de marca es la señal de normalidad.
+ */
+
+@theme {
+  --color-fondo: #e9ebe6;
+  --color-superficie: #fdfdfc;
+  --color-hueco: #f2f4f0;
+  --color-tinta: #15201b;
+  --color-tenue: #5e6a64;
+  --color-apagado: #8d968f;
+  --color-regla: #d2d7cf;
+  --color-regla-fuerte: #b6bdb3;
+
+  --color-acento: #1f4d5c;
+  --color-acento-suave: #e2edf0;
+  --color-acento-regla: #93b3bd;
+
+  --color-atencion: #8a6214;
+  --color-atencion-suave: #fbf2dd;
+
+  --color-bloqueo: #8a2d36;
+  --color-bloqueo-suave: #f9e9e8;
+
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* El valor que viene del maestro se lee carácter por carácter: cifras tabulares. */
+.dato {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: 0.92em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes latido {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.latido > span {
+  animation: latido 1.4s ease-in-out infinite;
+}
+.latido > span:nth-child(2) { animation-delay: 0.18s; }
+.latido > span:nth-child(3) { animation-delay: 0.36s; }
