@@ -1,0 +1,35 @@
+app = "reto01-agente-proveedor"
+primary_region = "bog"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  LLM_PROVIDER = "anthropic"
+  LLM_MODEL = "claude-haiku-5-5"
+  MAX_ITERACIONES_TURNO = "25"
+  MAX_TOKENS_SESION = "200000"
+  MAX_TOKENS_RESPUESTA = "16000"
+  FECHA_REFERENCIA = "2026-09-03"
+
+# La clave va como secreto, nunca en este archivo:
+#   fly secrets set ANTHROPIC_API_KEY=...
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
