@@ -1,35 +1,40 @@
-app = "reto01-agente-proveedor"
-primary_region = "bog"
+# Despliegue del reto 01 — agente de registro como proveedor.
+#
+# La región pedida era 'bog' (Bogotá), pero Fly la retiró; 'gru' (São Paulo) es
+# la más cercana que queda. Son ~100 ms extra, irrelevantes para un chat.
+#
+# La clave del modelo NUNCA va en este archivo. Se guarda como secreto:
+#   fly secrets set ANTHROPIC_API_KEY=...
+
+app = 'reto01-agente-proveedor'
+primary_region = 'gru'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "3000"
-  LLM_PROVIDER = "anthropic"
-  LLM_MODEL = "claude-haiku-5-5"
-  MAX_ITERACIONES_TURNO = "25"
-  MAX_TOKENS_SESION = "200000"
-  MAX_TOKENS_RESPUESTA = "16000"
-  FECHA_REFERENCIA = "2026-09-03"
-
-# La clave va como secreto, nunca en este archivo:
-#   fly secrets set ANTHROPIC_API_KEY=...
+  FECHA_REFERENCIA = '2026-09-03'
+  LLM_MODEL = 'claude-haiku-5-5'
+  LLM_PROVIDER = 'anthropic'
+  MAX_ITERACIONES_TURNO = '25'
+  MAX_TOKENS_RESPUESTA = '16000'
+  MAX_TOKENS_SESION = '200000'
+  PORT = '3000'
 
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = "suspend"
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
   min_machines_running = 1
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    path = "/api/health"
-    timeout = "5s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/api/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
