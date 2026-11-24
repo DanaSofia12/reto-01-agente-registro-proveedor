@@ -301,9 +301,9 @@ El front tiene una columna persistente con los conteos de campos, el checklist d
 | RN3 · qué bloquea la firma | Hecho |
 | RN5 · bitácora | Hecho |
 | Bonus §9.4 · módulo reutilizable | Hecho · generado, con `modulo:check` en CI |
-| §9.3 · link público | **Pendiente** · Dockerfile y fly.toml listos |
+| §9.3 · link público | Hecho · <https://reto01-agente-proveedor.fly.dev> |
 
-**Lo que falta para producción, más allá de las historias:** un dueño del dato del repositorio maestro, persistencia de sesiones (hoy en memoria: un reinicio las pierde), autenticación —el PRD la excluye pero un link público con una clave de pago detrás necesita al menos una barrera—, y observabilidad real en vez de `console.info`.
+**Lo que falta para producción, más allá de las historias:** un dueño del dato del repositorio maestro, persistencia de sesiones (hoy en memoria: un reinicio las pierde, y el despliegue queda atado a una sola instancia —se comprobó en producción: con dos máquinas el balanceador manda la mitad de los turnos a un proceso que no conoce la sesión ni tiene los artefactos—), autenticación —el PRD la excluye pero un link público con una clave de pago detrás necesita al menos una barrera—, y observabilidad real en vez de `console.info`.
 
 ---
 

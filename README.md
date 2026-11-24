@@ -152,15 +152,49 @@ El agente ejecuta cuatro herramientas, resume y **termina con una pregunta**. El
 
 ## Link de prueba
 
-Pendiente de desplegar. El `Dockerfile` y el `fly.toml` están listos:
+**<https://reto01-agente-proveedor.fly.dev>**
+
+No requiere clave de acceso ni registro. Abre el link, elige uno de los cuatro
+casos del panel inicial y el agente trabaja sobre los archivos reales del
+repositorio maestro.
+
+El estado del despliegue se consulta sin autenticación:
+
+```bash
+curl -s https://reto01-agente-proveedor.fly.dev/api/health
+```
+
+Responde `claveConfigurada: true/false` —nunca la clave— y la fecha de
+referencia contra la que se evalúan las vigencias.
+
+### Reproducirlo
 
 ```bash
 fly launch --no-deploy
-fly secrets set ANTHROPIC_API_KEY=...
-fly deploy
+fly secrets set ANTHROPIC_API_KEY=...   # solo el nombre viaja al repo
+fly deploy --ha=false                   # una sola máquina, ver abajo
 ```
 
-El link no requiere clave de acceso.
+La clave vive únicamente como secreto de Fly: no está en el `fly.toml`, ni en
+el repositorio, ni en la imagen, ni en las respuestas de la API (§8 del PRD).
+La región es `gru` porque Fly retiró `bog`.
+
+**`--ha=false` no es opcional.** Las sesiones viven en memoria y los artefactos
+en el disco local del proceso, así que la aplicación sólo es correcta con una
+instancia. Sin ese flag Fly levanta dos máquinas por alta disponibilidad
+—`min_machines_running = 1` es un piso, no un techo— y el balanceador reparte
+los turnos entre ambas: la mitad de las peticiones caen en una instancia que no
+conoce la sesión ni tiene los archivos. Se detectó así en el primer despliegue.
+
+Si ya quedaron dos:
+
+```bash
+fly scale count 1 --yes
+```
+
+Levantar la restricción es cuestión de mover el estado fuera del proceso
+—sesiones en Redis y artefactos en un volumen u object storage—, que es
+justo lo que pide producción y lo que el PRD deja fuera de alcance.
 
 ---
 
