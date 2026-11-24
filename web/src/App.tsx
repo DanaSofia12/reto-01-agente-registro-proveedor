@@ -69,6 +69,7 @@ export function App() {
   const [artefactos, setArtefactos] = useState<readonly string[]>([])
 
   const finRef = useRef<HTMLDivElement>(null)
+  const hiloRef = useRef<HTMLDivElement>(null)
   const entradaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -80,7 +81,25 @@ export function App() {
       .catch(() => setCasos([]))
   }, [])
 
-  const todasLasLlamadas = useMemo(() => turnos.flatMap((t) => t.llamadas), [turnos])
+  // Al cambiar de solicitud, el correo nuevo está arriba: hay que subir.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el disparador es el caso, no el nodo
+  useEffect(() => {
+    hiloRef.current?.scrollTo({ top: 0 })
+  }, [casoActual])
+
+  /**
+   * Un hilo por solicitud.
+   *
+   * La sesión del backend es una sola —el agente conserva todo el contexto—,
+   * pero en pantalla cada cliente tiene su conversación. Mezclarlas hacía que
+   * el expediente de un cliente mostrara los campos de otro, y que al elegir
+   * una solicitud nueva su correo quedara enterrado sobre el hilo anterior.
+   */
+  const turnosVisibles = useMemo(
+    () => turnos.filter((t) => t.caso === casoActual),
+    [turnos, casoActual],
+  )
+  const llamadasDelCaso = useMemo(() => turnosVisibles.flatMap((t) => t.llamadas), [turnosVisibles])
 
   /** Estado de cada solicitud, derivado de lo que las herramientas devolvieron. */
   const estados = useMemo((): ReadonlyMap<string, EstadoPorCaso> => {
@@ -178,8 +197,8 @@ export function App() {
     [enviar],
   )
 
-  const vacio = turnos.length === 0 && casoActual === null
-  const llamadasEnCurso = turnos[turnos.length - 1]?.llamadas ?? []
+  const vacio = turnosVisibles.length === 0 && casoActual === null
+  const llamadasEnCurso = turnosVisibles[turnosVisibles.length - 1]?.llamadas ?? []
 
   return (
     <div className="flex h-full flex-col bg-papel">
@@ -208,7 +227,10 @@ export function App() {
         </div>
 
         <main className="flex min-h-0 flex-col bg-nube">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-8">
+          <div
+            ref={hiloRef}
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-8"
+          >
             <div
               className={`mx-auto flex w-full max-w-[39rem] flex-col gap-5 ${vacio ? "my-auto" : ""}`}
             >
@@ -227,7 +249,7 @@ export function App() {
                 />
               )}
 
-              {turnos.map((turno) =>
+              {turnosVisibles.map((turno) =>
                 turno.rol === "usuario" ? (
                   <div key={turno.id} className="flex justify-end">
                     <p className="m-0 max-w-[78%] rounded-[18px] rounded-br-[5px] bg-carbon px-4 py-2.5 text-[14.5px] text-white">
@@ -323,7 +345,7 @@ export function App() {
             cliente={clienteActual}
             estado={estadoActual}
             caso={casoActual}
-            llamadas={todasLasLlamadas}
+            llamadas={llamadasDelCaso}
             artefactos={artefactos}
           />
         </div>
