@@ -75,3 +75,30 @@ export function fechaLarga(iso: string): string {
   if (nombreMes === undefined) return iso
   return `${Number(dia)} de ${nombreMes} de ${anio}`
 }
+
+// ─── Quién firma ──────────────────────────────────────────────────────────────
+
+export interface Firmante {
+  readonly nombre: string
+  readonly cargo: string
+  readonly email: string
+}
+
+/**
+ * El representante legal, leído del maestro.
+ *
+ * Importa porque el checklist es el documento que él recibe, y durante un
+ * tiempo no decía quién firmaba ni a dónde mandárselo: hablaba de «el
+ * representante legal» en abstracto teniendo su nombre a mano.
+ */
+export function firmanteDe(maestro: Record<string, unknown>): Firmante | null {
+  const bruto = maestro.representante_legal
+  if (typeof bruto !== "object" || bruto === null) return null
+  const r = bruto as Record<string, unknown>
+  if (typeof r.nombre !== "string" || r.nombre === "") return null
+  return {
+    nombre: r.nombre,
+    cargo: typeof r.cargo === "string" ? r.cargo : "",
+    email: typeof r.email === "string" ? r.email : "",
+  }
+}

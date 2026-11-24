@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { nombrePais, nombreSoporte } from "../domain/etiquetas.ts"
+import { firmanteDe, nombrePais, nombreSoporte } from "../domain/etiquetas.ts"
 import { mapearCampos } from "../domain/mapeo.ts"
 import type { Checklist, ContextoHerramienta, Mapeo, Solicitud } from "../domain/tipos.ts"
 import { campos as camposOrdenados } from "../domain/tipos.ts"
@@ -344,7 +344,11 @@ export const armar_paquete = {
         }
       }
 
-      escribirTexto(ctx.directory, `${base}/checklist.md`, checklistMd(solicitud, checklist))
+      escribirTexto(
+        ctx.directory,
+        `${base}/checklist.md`,
+        checklistMd(solicitud, checklist, firmanteDe(leerMaestro(ctx.directory))),
+      )
       escribirTexto(
         ctx.directory,
         `${base}/borrador-correo.md`,

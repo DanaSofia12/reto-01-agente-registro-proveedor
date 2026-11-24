@@ -1,4 +1,4 @@
-import { fechaLarga, nombrePais } from "../domain/etiquetas.ts"
+import { type Firmante, fechaLarga, nombrePais } from "../domain/etiquetas.ts"
 import type { Checklist, Mapeo, Solicitud } from "../domain/tipos.ts"
 import { campos } from "../domain/tipos.ts"
 
@@ -98,10 +98,18 @@ const ETIQUETA_ESTADO: Readonly<Record<string, string>> = {
   vencido: "**vencido**",
 }
 
-export function checklistMd(solicitud: Solicitud, checklist: Checklist): string {
+export function checklistMd(
+  solicitud: Solicitud,
+  checklist: Checklist,
+  firmante: Firmante | null,
+): string {
   const bloqueos = checklist.items.filter((i) => i.bloquea)
   const lineas = [
     `# Lista de verificación para la firma — ${titulo(solicitud)}`,
+    "",
+    firmante === null
+      ? "Para la firma del representante legal."
+      : `Para la firma de **${firmante.nombre}**${firmante.cargo === "" ? "" : `, ${firmante.cargo}`}${firmante.email === "" ? "" : ` (${firmante.email})`}.`,
     "",
     `Vigencias evaluadas al **${fechaLarga(checklist.fechaReferencia)}**.`,
     "",

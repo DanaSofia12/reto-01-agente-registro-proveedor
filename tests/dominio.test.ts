@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fechaLarga, nombrePais, nombreSoporte } from "../src/domain/etiquetas.ts"
+import { fechaLarga, firmanteDe, nombrePais, nombreSoporte } from "../src/domain/etiquetas.ts"
 import { mapearCampos, PISO_CANDIDATO, UMBRAL_CONFIANZA } from "../src/domain/mapeo.ts"
 import { identificadorDe, notaIdentificador } from "../src/domain/paises.ts"
 import { normalizar, similitud } from "../src/domain/texto.ts"
@@ -286,5 +286,21 @@ describe("etiquetas — nada de identificadores en pantalla", () => {
     expect(nombrePais("EC")).toBe("Ecuador")
     expect(nombrePais("ec")).toBe("Ecuador")
     expect(nombrePais("XX")).toBe("XX")
+  })
+})
+
+describe("el firmante — el actor que recibe el paquete", () => {
+  test("se lee del maestro con nombre, cargo y correo", () => {
+    const f = firmanteDe(MAESTRO as unknown as Record<string, unknown>)
+    expect(f).not.toBeNull()
+    expect(f?.nombre).toBe("Roberto Andrade Salazar")
+    expect(f?.cargo).toBe("Gerente General")
+    expect(f?.email).toContain("@")
+  })
+
+  test("un maestro sin representante legal no rompe nada, devuelve null", () => {
+    expect(firmanteDe({})).toBeNull()
+    expect(firmanteDe({ representante_legal: null })).toBeNull()
+    expect(firmanteDe({ representante_legal: { cargo: "Gerente" } })).toBeNull()
   })
 })
