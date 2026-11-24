@@ -4,6 +4,16 @@ Agente conversacional que lee una solicitud de registro como proveedor, llena el
 
 Reto técnico 01 · Equipo Perxia 2.0 · Periferia IT Group.
 
+| | |
+|---|---|
+| **Probarlo** | **<https://reto01-agente-proveedor.fly.dev>** — sin clave de acceso |
+| **Sin modelo** | `bun install && bun run demo.ts` — recorre los cuatro casos sin clave de ningún proveedor |
+| **Planteamiento** | [`SOLUCION.md`](./SOLUCION.md) |
+
+Abre una solicitud de la bandeja, léela, y pídele al agente que la revise.
+Prepara el formulario y el paquete; la firma y el envío siguen siendo de una
+persona.
+
 ---
 
 ## Arrancar en local
