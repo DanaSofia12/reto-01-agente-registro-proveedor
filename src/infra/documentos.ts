@@ -159,7 +159,6 @@ export function checklistMd(solicitud: Solicitud, checklist: Checklist): string 
 
 export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: Checklist): string {
   const presentes = checklist.items.filter((i) => i.estado === "presente")
-  const extension = solicitud.formato === "xlsx" ? "xlsx" : "pdf"
 
   const lineas = [
     `# Borrador de correo — ${titulo(solicitud)}`,
@@ -177,7 +176,9 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
     "",
   ]
 
-  for (const item of presentes) lineas.push(`- ${item.tipo.replace(/_/g, " ")}`)
+  // Este texto lo lee el cliente. Un "- camara comercio" en un correo
+  // corporativo delata que lo escribió una máquina.
+  for (const item of presentes) lineas.push(`- ${item.nombre}`)
   if (presentes.length === 0) lineas.push("- (ningún soporte disponible en este momento)")
   lineas.push("")
 
@@ -221,7 +222,7 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
     "",
     "---",
     "",
-    `_Adjuntos sugeridos: \`formulario.${extension}\` y ${presentes.length} soporte(s) de la carpeta \`paquete/\`._`,
+    `_Antes de enviarlo: adjunta el formulario diligenciado y ${presentes.length === 1 ? "el soporte que quedó" : `los ${presentes.length} soportes que quedaron`} en el paquete._`,
     "",
     "_Nota: los datos bancarios no se incluyen en este correo. Van únicamente dentro del formulario, y solo si la plantilla del cliente los pidió._",
     "",
@@ -275,10 +276,10 @@ export function valoresPortalMd(solicitud: Solicitud, mapeo: Mapeo, checklist: C
     const estado =
       item.estado === "presente"
         ? item.vigenciaHasta === null
-          ? "sin vencimiento"
-          : `vigente hasta ${item.vigenciaHasta}`
+          ? "no vence"
+          : `vigente hasta el ${fechaLarga(item.vigenciaHasta)}`
         : (ETIQUETA_ESTADO[item.estado] ?? item.estado)
-    lineas.push(`| ${item.tipo.replace(/_/g, " ")} | ${archivo} | ${estado} |`)
+    lineas.push(`| ${item.nombre} | ${archivo} | ${estado} |`)
   }
   lineas.push("")
 

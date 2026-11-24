@@ -274,3 +274,36 @@ describe("el proceso continúa con lo que sí puede hacer", () => {
     writeFileSync(PLANTILLA, original, "utf8")
   })
 })
+
+describe("ningún identificador interno llega a un documento que lee una persona", () => {
+  /**
+   * El borrador de correo lo lee el CLIENTE. Llegó a listar "camara comercio" y
+   * "certificacion bancaria" —los identificadores con los guiones cambiados por
+   * espacios—, que en un correo corporativo delata que lo escribió una máquina.
+   */
+  const SOSPECHOSOS = [
+    /[a-z]+_[a-z_]+/, // snake_case
+    /\bco-industrias-delta\b|\bec-corp-andina\b|\bpa-logistica-istmo\b|\bhn-agroexport-sula\b/,
+    /camara comercio|certificacion bancaria/i,
+    /\bout\//,
+    /fixtures\//,
+  ]
+
+  test("el borrador de correo, el checklist y el reporte de faltantes están limpios", async () => {
+    for (const caso of ["co-industrias-delta", "ec-corp-andina"]) {
+      await invocar("proveedor_armar_paquete", { caso })
+      for (const relativo of [
+        "faltantes.md",
+        "paquete/checklist.md",
+        "paquete/borrador-correo.md",
+      ]) {
+        const ruta = path.join(RAIZ, "out", caso, relativo)
+        if (!existsSync(ruta)) continue
+        const texto = readFileSync(ruta, "utf8")
+        for (const patron of SOSPECHOSOS) {
+          expect(patron.test(texto), `${relativo} de ${caso} contiene ${patron}`).toBe(false)
+        }
+      }
+    }
+  })
+})
