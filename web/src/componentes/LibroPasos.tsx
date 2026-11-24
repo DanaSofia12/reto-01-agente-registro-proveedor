@@ -4,13 +4,12 @@ import { accion, accionEnCurso } from "../lenguaje.ts"
 /**
  * Lo que hizo el agente, paso a paso.
  *
- * Requisito §6.1: cada llamada a herramienta tiene que ser visible. Antes se
- * cumplía mostrando el nombre de la función y su JSON de argumentos, que es
- * visible para un programador y opaco para quien hace este trabajo.
+ * Cada llamada a herramienta tiene que ser visible, pero mostrar el nombre de
+ * la función y su JSON es visible para un programador y opaco para quien hace
+ * este trabajo. Aquí cada paso es una frase en su idioma.
  *
- * Aquí cada paso es una frase en su idioma, con el resultado al lado. Se
- * numera porque es una secuencia real —cada línea es una iteración del ciclo
- * del agente—, no un indicador de progreso decorativo.
+ * Se numera porque es una secuencia real: cada línea es una iteración del
+ * bucle del agente, no un indicador de progreso decorativo.
  */
 
 function lista(datos: Record<string, unknown>, clave: string): unknown[] {

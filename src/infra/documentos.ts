@@ -3,7 +3,7 @@ import { campos } from "../domain/tipos.ts"
 
 /** Artefactos en Markdown. Funciones puras: reciben datos, devuelven texto. */
 
-/** RN2 — ninguna clave bajo `banco.` sale de un formulario. */
+/** Ninguna clave bajo `banco.` sale de un documento que no sea el formulario. */
 const PREFIJO_BANCARIO = "banco."
 
 function esBancario(origen: string | null | undefined): boolean {
@@ -68,7 +68,7 @@ export function faltantesMd(solicitud: Solicitud, mapeo: Mapeo): string {
   return lineas.join("\n")
 }
 
-// ─── Checklist del paquete (HU-4) ─────────────────────────────────────────────
+// ─── Checklist del paquete ────────────────────────────────────────────────────
 
 const ETIQUETA_ESTADO: Readonly<Record<string, string>> = {
   presente: "presente",
@@ -132,7 +132,7 @@ export function checklistMd(solicitud: Solicitud, checklist: Checklist): string 
   return lineas.join("\n")
 }
 
-// ─── Borrador de correo (HU-4 · RN2) ──────────────────────────────────────────
+// ─── Borrador de correo ───────────────────────────────────────────────────────
 
 export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: Checklist): string {
   const presentes = checklist.items.filter((i) => i.estado === "presente")
@@ -158,7 +158,7 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
   if (presentes.length === 0) lineas.push("- (ningún soporte disponible en este momento)")
   lineas.push("")
 
-  // RN2 — ni el valor ni la etiqueta de un campo bancario entran en el correo.
+  // Ni el valor ni la etiqueta de un campo bancario entran en el correo.
   // Solo los que de verdad llevan valor: un cruce dudoso quedó vacío y
   // afirmar que se diligenció sería falso en un correo al cliente.
   const confirmar = mapeo.requiere_confirmacion.filter(
@@ -206,7 +206,7 @@ export function borradorCorreoMd(solicitud: Solicitud, mapeo: Mapeo, checklist: 
   return lineas.join("\n")
 }
 
-// ─── Valores para portal (HU-3 P2) ────────────────────────────────────────────
+// ─── Valores para portal ──────────────────────────────────────────────────────
 
 export function valoresPortalMd(solicitud: Solicitud, mapeo: Mapeo, checklist: Checklist): string {
   const ordenados = campos(mapeo)
@@ -273,7 +273,7 @@ export function valoresPortalMd(solicitud: Solicitud, mapeo: Mapeo, checklist: C
   return lineas.join("\n")
 }
 
-// ─── Envío simulado (HU-4) ────────────────────────────────────────────────────
+// ─── Envío simulado ───────────────────────────────────────────────────────────
 
 export function envioSimuladoMd(solicitud: Solicitud, checklist: Checklist, ahora: Date): string {
   const presentes = checklist.items.filter((i) => i.estado === "presente")

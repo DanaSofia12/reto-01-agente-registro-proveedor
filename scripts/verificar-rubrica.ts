@@ -400,7 +400,7 @@ const CRITERIOS: readonly Criterio[] = [
     id: "F3",
     descripcion: "hay dos implementaciones del adaptador LLM",
     comprobar: () =>
-      existsSync(archivo("src/llm/anthropic.ts")) && existsSync(archivo("src/llm/openai.ts")),
+      existsSync(archivo("src/llm/anthropic.ts")) && existsSync(archivo("src/llm/mock.ts")),
   },
   {
     id: "F5",

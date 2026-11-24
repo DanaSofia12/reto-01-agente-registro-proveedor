@@ -41,7 +41,7 @@ describe("esConfirmacion", () => {
   })
 })
 
-describe("CA1 — tope de iteraciones", () => {
+describe("tope de iteraciones por turno", () => {
   test("al alcanzarlo responde con lo que tiene, no con silencio ni error", async () => {
     // Un guion que pide herramientas para siempre: el tope debe cortarlo.
     const infinito: GuionTurno[] = Array.from({ length: 40 }, () => ({
@@ -60,7 +60,7 @@ describe("CA1 — tope de iteraciones", () => {
   })
 })
 
-describe("CA3 / RN4 — la confirmación la impone el servidor", () => {
+describe("la confirmación la impone el servidor, no el prompt", () => {
   test("el modelo no puede autoconfirmar: el gate fuerza confirmado=false", async () => {
     // El modelo pide el envío con confirmado:true sin que nadie lo haya pedido.
     const ejecutar = ciclo([
@@ -172,7 +172,7 @@ describe("CA3 / RN4 — la confirmación la impone el servidor", () => {
   })
 })
 
-describe("CA4 — las llamadas quedan en el historial visible", () => {
+describe("las llamadas quedan en el historial visible", () => {
   test("cada llamada se registra con nombre, argumentos y resultado", async () => {
     const ejecutar = ciclo([
       {
@@ -199,7 +199,7 @@ describe("CA4 — las llamadas quedan en el historial visible", () => {
   })
 })
 
-describe("CA5 — un error de herramienta no mata la sesión", () => {
+describe("un error de herramienta no mata la sesión", () => {
   test("el caso inexistente vuelve al modelo y el turno termina bien", async () => {
     const ejecutar = ciclo([
       {
@@ -304,7 +304,7 @@ describe("regresión — el gate no se abre con un asentimiento genérico", () =
   })
 })
 
-describe("CA3 — no se resalta confirmación si el agente no preguntó", () => {
+describe("no se resalta confirmación si el agente no preguntó", () => {
   test("con 'no envíes nada todavía' el turno no queda pendiente", async () => {
     const ejecutar = ciclo([
       {
@@ -327,7 +327,7 @@ describe("CA3 — no se resalta confirmación si el agente no preguntó", () => 
   })
 })
 
-describe("CA4 — las llamadas rechazadas por validación también se registran", () => {
+describe("las llamadas rechazadas por validación también se registran", () => {
   test("un argumento inválido deja línea en out/log.jsonl", async () => {
     const ejecutar = ciclo([
       {

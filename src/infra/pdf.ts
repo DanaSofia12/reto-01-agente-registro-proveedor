@@ -2,7 +2,7 @@ import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf
 import type { CampoMapeado, Solicitud } from "../domain/tipos.ts"
 
 /**
- * HU-3 P1 — PDF generado (no AcroForm rellenado), con todos los campos en el
+ * PDF generado desde cero, no un AcroForm rellenado, con todos los campos en el
  * orden que define `plantilla-campos.json`.
  */
 

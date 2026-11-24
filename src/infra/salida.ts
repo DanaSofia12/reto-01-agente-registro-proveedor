@@ -39,7 +39,7 @@ export function anexarLinea(directory: string, relativa: string, linea: string):
   writeFileSync(destino, `${linea}\n`, { flag: "a" })
 }
 
-/** `out/` se limpia al inicio de demo.ts (NFR Determinismo). */
+/** `out/` se limpia al arrancar la demo: dos corridas deben dar lo mismo. */
 export function limpiarSalida(directory: string): void {
   const raiz = rutaSalida(directory)
   if (existsSync(raiz)) rmSync(raiz, { recursive: true, force: true })

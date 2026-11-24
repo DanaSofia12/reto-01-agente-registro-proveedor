@@ -23,13 +23,13 @@ El dolor de fondo no es el tecleo: es que mientras el registro no cierre, **Peri
 │   · rail de estado        │                                     ▼
 └───────────────────────────┘                     ┌──────────────────────────────────┐
                                                   │  src/agent/ciclo.ts              │
-                                                  │   bucle · tope 25 · gate RN4     │
+                                                  │   bucle · tope 25 · confirmación │
                                                   └───────┬──────────────────┬───────┘
                                                           │                  │
                                         ┌─────────────────▼──────┐   ┌───────▼────────────┐
                                         │ src/llm/adapter.ts     │   │ src/tools/         │
-                                        │  anthropic │ openai    │   │  proveedor.ts      │
-                                        │  mock (tests)          │   │  registro.ts (zod) │
+                                        │  anthropic │ mock      │   │  proveedor.ts      │
+                                        │                        │   │  registro.ts (zod) │
                                         └────────────────────────┘   └───────┬────────────┘
                                                                              │
                                                    ┌─────────────────────────▼───────────┐
@@ -357,11 +357,10 @@ La arquitectura, los trade-offs y la calibración de los umbrales. Cada decisió
 | Paquete | Para qué | Alternativa descartada |
 |---|---|---|
 | `zod` | Obligatorio por el PRD. Valida argumentos **y** genera el JSON Schema del modelo con `z.toJSONSchema()` — una sola fuente de verdad | `zod-to-json-schema` como paquete aparte |
-| `@anthropic-ai/sdk` | Cliente del proveedor elegido | — |
-| `openai` | Segunda implementación del adaptador | Ninguna: sin ella, la abstracción sería una afirmación sin prueba |
+| `@anthropic-ai/sdk` | Cliente del proveedor elegido. El adaptador tiene una segunda implementación —`mock`— que los tests usan de verdad, así que la abstracción no es decorativa | Había también un adaptador de OpenAI; se quitó por ser código muerto y 20 MB en la imagen |
 | `exceljs` | Escritura por dirección de celda, que es la forma exacta de `plantilla-celdas.json` | SheetJS: distribución fuera de npm |
 | `pdf-lib` | PDF sin binarios ni navegador headless | Puppeteer: ~300 MB contra el NFR de arranque en menos de 2 minutos |
-| `react`, `vite`, `tailwindcss` | Front de chat con estado real (streaming de tarjetas, confirmación, rail) | HTML plano: más rápido de escribir, peor para el estado |
+| `react`, `vite`, `tailwindcss` | Front de chat con estado real (pasos del agente, confirmación, expediente) | HTML plano: más rápido de escribir, peor para el estado |
 | `@biomejs/biome` | Lint y formato en un binario, con `noExplicitAny` en error | ESLint + Prettier + plugins |
 
 Todo lo demás —servidor HTTP, test runner, carga de `.env`, ejecución de TypeScript— lo cubre Bun sin dependencias.

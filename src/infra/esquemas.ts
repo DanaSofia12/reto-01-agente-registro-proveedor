@@ -2,7 +2,7 @@ import { z } from "zod"
 
 /**
  * Esquemas de los fixtures. Validar al leer convierte "plantilla corrupta"
- * en un error legible en vez de en un `undefined` tres capas más abajo (HU-5).
+ * en un error legible en vez de en un `undefined` tres capas más abajo.
  */
 
 export const PaisSchema = z.enum(["CO", "EC", "PE", "PA", "HN"])
@@ -11,7 +11,7 @@ export const FormatoSchema = z.enum(["xlsx", "pdf", "portal"])
 export const SolicitudSchema = z.object({
   id: z.string(),
   de: z.string(),
-  // §7.1 del PRD no lo lista; los fixtures sí lo traen.
+  // El campo no está documentado, pero los fixtures lo traen.
   para: z.string().default(""),
   asunto: z.string(),
   fecha: z.string(),

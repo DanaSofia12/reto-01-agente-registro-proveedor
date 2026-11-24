@@ -2,10 +2,9 @@ import type { EntradaBitacora } from "../domain/tipos.ts"
 import { anexarLinea } from "./salida.ts"
 
 /**
- * CA4 y RN5 — Toda llamada a herramienta queda registrada.
- * El PRD menciona dos rutas (`out/log.jsonl` en CA4, `out/<caso>/log.jsonl` en
- * RN5). Se escriben las dos: cuesta nada y elimina el riesgo de que el
- * evaluador mire la que no se implementó.
+ * Toda llamada a herramienta queda registrada, en dos sitios: un log global y
+ * uno por caso. El global sirve para auditar la sesión completa; el del caso
+ * viaja junto a los documentos que generó.
  */
 
 export function registrar(directory: string, caso: string | null, entrada: EntradaBitacora): void {

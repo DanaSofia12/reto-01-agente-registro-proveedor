@@ -1,13 +1,8 @@
 /**
- * El momento en que la decisión pasa de la máquina a la persona.
+ * Donde la decisión pasa de la máquina a la persona.
  *
- * Es el único sitio donde el diseño gasta peso visual. Y es la única vía por
- * la que una acción hacia afuera queda autorizada: el botón manda la
- * confirmación por un canal aparte, sin depender de que el servidor adivine
- * bien si «ok, gracias» significaba que sí.
- *
- * El texto nunca le pide teclear una fórmula. Ella decide con un clic o
- * responde como hable.
+ * El botón manda la confirmación por un canal aparte, sin depender de que el
+ * servidor acierte al interpretar texto libre. Nunca pide teclear una fórmula.
  */
 export function BloqueConfirmacion({
   cliente,

@@ -12,15 +12,12 @@ import {
 /**
  * Implementación para Claude.
  *
- * Decisiones que importan y por qué:
- * - El prompt de sistema lleva `cache_control`. El orden de renderizado es
- *   tools -> system -> messages, así que un punto de caché en el último bloque
- *   de system cachea herramientas y prompt juntos: ~4 200 tokens estables que
- *   se repiten en las ~5 llamadas de cada caso, a 10 % del precio de entrada.
- * - Todos los `tool_result` van en UN solo mensaje de usuario. Repartirlos
- *   entre varios le enseña al modelo a dejar de pedir herramientas en paralelo.
+ * - `cache_control` va en el último bloque de system. Como el orden de
+ *   renderizado es tools → system → messages, eso cachea herramientas y prompt
+ *   juntos: ~4 200 tokens estables a 10 % del precio de entrada.
+ * - Los `tool_result` van todos en un solo mensaje. Repartirlos entre varios
+ *   le enseña al modelo a dejar de pedir herramientas en paralelo.
  * - Sin `temperature` ni `top_p`: los modelos actuales los rechazan con 400.
- *   El estilo se guía desde `agent/prompt.md`.
  */
 
 type BloqueContenido = Anthropic.Messages.ContentBlockParam

@@ -52,14 +52,15 @@ function registrar(archivo: string, modulo: Record<string, unknown>): Herramient
 
       async ejecutar(argumentos, ctx) {
         // El backend valida ANTES de ejecutar y devuelve el error al modelo,
-        // no a la analista: el modelo corrige los argumentos y reintenta (§6.2).
+        // no a la analista: el modelo corrige los argumentos y reintenta.
         const validados = esquemaZod.safeParse(argumentos ?? {})
         if (!validados.success) {
           const detalle = validados.error.issues
             .map((i) => `${i.path.join(".") || "argumentos"}: ${i.message}`)
             .join("; ")
           const error = `argumentos inválidos para ${nombre} — ${detalle}`
-          // CA4 dice "toda llamada": una rechazada por zod también se registra.
+          // Toda llamada queda registrada, también la que zod rechaza: una
+          // bitácora con huecos no sirve para auditar.
           try {
             registrarEnBitacora(ctx.directory, null, entrada(nombre, false, error))
           } catch {

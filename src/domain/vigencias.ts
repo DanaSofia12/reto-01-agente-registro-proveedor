@@ -2,7 +2,7 @@ import { nombreSoporte } from "./etiquetas.ts"
 import type { Checklist, ItemChecklist, SoporteIndexado } from "./tipos.ts"
 
 /**
- * RN3 — Qué bloquea la firma del representante legal.
+ * Qué impide que el representante legal firme.
  *
  * La distinción no es arbitraria: un soporte ausente o vencido se tramita
  * afuera y toma días; un campo faltante lo responde alguien de Periferia en

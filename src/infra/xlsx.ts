@@ -2,7 +2,7 @@ import ExcelJS from "exceljs"
 import type { CampoMapeado } from "../domain/tipos.ts"
 
 /**
- * HU-3 P0 — Escribe cada etiqueta y su valor exactamente en la hoja y celda
+ * Escribe cada etiqueta y su valor exactamente en la hoja y celda
  * que indica `plantilla-celdas.json`. El sistema del cliente lee celdas fijas:
  * reformatear no es una opción.
  */

@@ -52,7 +52,7 @@ describe("leerRuta y formatearValor", () => {
   })
 })
 
-describe("RN1 — identificador tributario por país", () => {
+describe("identificador tributario por país", () => {
   test("cada país nombra el identificador a su manera", () => {
     expect(identificadorDe("CO")).toBe("NIT")
     expect(identificadorDe("EC")).toBe("RUC")
@@ -129,7 +129,7 @@ describe("mapearCampos", () => {
     expect(todos[0]?.estado).toBe("faltante")
   })
 
-  test("RN1 — el RUC ecuatoriano se llena con el NIT y se marca", () => {
+  test("el RUC ecuatoriano se llena con el NIT y se marca", () => {
     const { requiere_confirmacion, llenos } = mapearCampos({
       campos: [campo("RUC")],
       maestro: MAESTRO,
@@ -141,7 +141,7 @@ describe("mapearCampos", () => {
     expect(requiere_confirmacion[0]?.nota).toContain("identificador extranjero")
   })
 
-  test("RN1 — el NIT colombiano no necesita confirmación", () => {
+  test("el NIT colombiano no necesita confirmación", () => {
     const { llenos, requiere_confirmacion } = mapearCampos({
       campos: [campo("NIT")],
       maestro: MAESTRO,
@@ -172,7 +172,7 @@ describe("mapearCampos", () => {
   })
 })
 
-describe("RN3 — qué bloquea la firma", () => {
+describe("qué bloquea la firma", () => {
   const ref = new Date("2026-09-03T00:00:00Z")
 
   test("un soporte sin fecha de vigencia no vence nunca", () => {

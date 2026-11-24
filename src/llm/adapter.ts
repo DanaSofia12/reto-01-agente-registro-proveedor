@@ -3,7 +3,7 @@
  *
  * El ciclo del agente habla solo con estos tipos. Cambiar de proveedor es
  * escribir otra implementación de `ProveedorLLM` y cambiar `LLM_PROVIDER`:
- * `src/agent/ciclo.ts` no se toca (§6.1 del PRD).
+ * `src/agent/ciclo.ts` no se toca.
  */
 
 export interface LlamadaHerramienta {
@@ -77,7 +77,7 @@ export interface ProveedorLLM {
   ): Promise<RespuestaLLM>
 }
 
-/** Error del proveedor, ya traducido a lenguaje de la analista (CA5). */
+/** Error del proveedor, ya traducido a algo que la analista pueda leer. */
 export class ErrorProveedor extends Error {
   constructor(
     mensaje: string,

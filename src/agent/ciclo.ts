@@ -19,12 +19,11 @@ import {
 } from "./sesion.ts"
 
 /**
- * El ciclo del agente (§6.3 del PRD).
+ * El bucle del agente: pedir al modelo, ejecutar lo que pida, repetir.
  *
- * Implementado a mano en vez de con el tool runner del SDK: el reto evalúa
- * explícitamente el bucle, el tope de iteraciones y la confirmación humana, y
- * exige poder explicar cada línea. Delegar eso a una abstracción del SDK
- * regalaría justo lo que se califica. Ver SOLUCION.md, decisión 2.
+ * Escrito a mano en vez de usar el tool runner del SDK porque el tope de
+ * iteraciones, el gate de confirmación y el manejo de errores son reglas de
+ * este negocio, no del proveedor. Ver SOLUCION.md, decisión 2.
  */
 
 const HERRAMIENTAS_LLM: readonly HerramientaLLM[] = HERRAMIENTAS.map((h) => ({
@@ -37,7 +36,7 @@ const HERRAMIENTAS_LLM: readonly HerramientaLLM[] = HERRAMIENTAS.map((h) => ({
 const ACCIONES_EXTERNAS = new Set(["proveedor_simular_envio"])
 
 /**
- * El prompt de sistema vive en archivos, no en código (§6.1).
+ * El prompt vive en archivos, no en código.
  * Se lee una vez al arrancar: el prefijo debe ser idéntico byte a byte en cada
  * petición o el caché de prompt no sirve de nada.
  */
@@ -112,7 +111,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     // inequívoca; el texto libre solo confirma si no deja lugar a duda.
     // Se fotografía al abrir el turno: nada que se arme DENTRO de este turno
     // puede autorizarse en él. Arrancar y disparar en el mismo turno sigue
-    // siendo imposible, que es la propiedad que protege RN4.
+    // siendo imposible: es la propiedad que hace seguro el gate.
     const autorizables = new Set(sesion.paquetesArmados)
     const confirmadoAhora =
       autorizables.size > 0 && (confirmacionExplicita || esConfirmacion(mensaje))
@@ -130,7 +129,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     let respuestaFinal = ""
 
     while (iteracion < config.MAX_ITERACIONES_TURNO) {
-      // NFR Costo — tope acumulado por sesión.
+      // Tope acumulado por sesión.
       if (tokensConsumidos(sesion) >= config.MAX_TOKENS_SESION) {
         respuestaFinal =
           "Esta sesión alcanzó su límite de tokens. Abre una sesión nueva para continuar; los archivos ya generados siguen en `out/`."
@@ -147,7 +146,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
           timeoutMs: config.LLM_TIMEOUT_MS,
         })
       } catch (causa) {
-        // CA5 — el error se muestra en lenguaje claro y la sesión no muere.
+        // El error se muestra en lenguaje claro y la sesión no muere.
         const texto =
           causa instanceof ErrorProveedor
             ? causa.message
@@ -203,7 +202,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
       sesion.mensajes.push({ rol: "resultados", resultados })
     }
 
-    // CA1 — al tocar el tope responde con lo que tiene, no con silencio ni error.
+    // Al tocar el tope responde con lo que tiene, no con silencio ni error.
     if (respuestaFinal === "" && iteracion >= config.MAX_ITERACIONES_TURNO) {
       const hechas = llamadasDelTurno.map((l) => l.nombre).join(", ")
       respuestaFinal = [
@@ -213,14 +212,10 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
       ].join("")
     }
 
-    // CA3 condiciona el resaltado a que el agente TERMINE el turno con una
-    // pregunta. Si no preguntó —por ejemplo porque la analista dijo "no envíes
-    // nada todavía"— no hay nada que confirmar y el front no debe insistir.
-    //
     // El resalte es de interfaz; el permiso es `paquetesArmados` más una
-    // confirmación inequívoca. Separarlos es lo que arregla el caso en que el
-    // agente dedica un turno entero a preguntar: antes la pregunta salía sin
-    // su botón porque ese turno no armaba ningún paquete nuevo.
+    // confirmación inequívoca. Están separados a propósito: si el agente dedica
+    // un turno entero a preguntar, ese turno no arma ningún paquete, y antes la
+    // pregunta salía sin su botón.
     sesion.esperandoRespuesta = respuestaFinal.includes("?") || respuestaFinal.includes("¿")
 
     sesion.historial.push({
@@ -279,10 +274,9 @@ async function ejecutarLlamada(
 
   let argumentos = llamada.argumentos
 
-  // RN4 — la frontera de la confirmación la impone el servidor, no el prompt.
-  // Si el modelo pide `confirmado: true` sin que el turno anterior haya quedado
-  // esperando esta acción y sin que el usuario la haya confirmado, se fuerza a
-  // false y la herramienta responde el rechazo del contrato.
+  // La frontera la impone el servidor, no el prompt. Si el modelo pide
+  // `confirmado: true` sin autorización real, se fuerza a false y la
+  // herramienta rechaza. Un prompt se puede convencer; esto no.
   if (ACCIONES_EXTERNAS.has(llamada.nombre)) {
     const autorizado =
       confirmacion.confirmadoAhora && caso !== null && confirmacion.autorizables.has(caso)

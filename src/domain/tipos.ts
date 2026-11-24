@@ -40,7 +40,7 @@ export interface SoporteIndexado {
   readonly descripcion: string
 }
 
-// ─── Mapeo (HU-2) ─────────────────────────────────────────────────────────────
+// ─── Mapeo de campos ──────────────────────────────────────────────────────────
 
 export type EstadoCampo = "lleno" | "faltante" | "requiere_confirmacion"
 
@@ -63,7 +63,7 @@ export interface CampoLleno extends CampoBase {
 
 export interface CampoRequiereConfirmacion extends CampoBase {
   readonly estado: "requiere_confirmacion"
-  /** RN1 llena el valor aunque requiera confirmación. */
+  /** El identificador tributario se llena aunque requiera confirmación. */
   readonly valor: string | null
   readonly origen: string | null
   readonly confianza: number
@@ -92,7 +92,7 @@ export function campos(mapeo: Mapeo): readonly CampoMapeado[] {
   )
 }
 
-// ─── Paquete para firma (HU-4) ────────────────────────────────────────────────
+// ─── Paquete para firma ───────────────────────────────────────────────────────
 
 export type EstadoSoporte = "presente" | "ausente" | "vencido"
 
@@ -114,7 +114,7 @@ export interface Checklist {
   readonly camposFaltantes: readonly string[]
 }
 
-// ─── Contrato de herramientas (§6.2 del PRD) ──────────────────────────────────
+// ─── Contrato de herramientas ─────────────────────────────────────────────────
 
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -126,7 +126,7 @@ export interface ContextoHerramienta {
   readonly fechaReferencia: Date
 }
 
-// ─── Bitácora (CA4 / RN5) ─────────────────────────────────────────────────────
+// ─── Bitácora ─────────────────────────────────────────────────────────────────
 
 export interface EntradaBitacora {
   readonly ts: string

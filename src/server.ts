@@ -12,7 +12,7 @@ import { HERRAMIENTAS } from "./tools/registro.ts"
  * API HTTP y servidor de estáticos. Un solo proceso sirve /api/* y web/dist.
  *
  * Deliberadamente delgado: toda la lógica vive en domain/, tools/ y agent/.
- * Un cambio de reglas de negocio no toca este archivo (§6.5 del PRD).
+ * Un cambio de reglas de negocio no toca este archivo.
  */
 
 const RAIZ = path.resolve(import.meta.dir, "..")
@@ -55,7 +55,7 @@ function error(mensaje: string, estado: number): Response {
 }
 
 /**
- * Rate limit por ORIGEN, no por sesión (NFR Costo).
+ * Rate limit por ORIGEN, no por sesión.
  *
  * El `sessionId` lo elige el cliente: limitar por él se evade rotándolo en
  * cada petición, que es justo lo que hace un abusador. El link es público y la
@@ -124,7 +124,7 @@ async function postChat(peticion: Request, servidor: Bun.Server<undefined>): Pro
   try {
     return json(await cicloListo(sesion, mensaje, cuerpo.confirmacion === true))
   } catch (causa) {
-    // Última red: ni un fallo inesperado mata la sesión (CA5).
+    // Última red: ni un fallo inesperado mata la sesión.
     const texto = causa instanceof Error ? causa.message : "error inesperado en el ciclo del agente"
     return json(
       { reply: texto, toolCalls: [], needsConfirmation: false, sessionId: sesion.id },
@@ -146,7 +146,7 @@ function getSesion(id: string): Response {
   })
 }
 
-/** Nunca expone la clave, ni su longitud, ni su prefijo (NFR Seguridad). */
+/** Responde si hay clave configurada, nunca cuál ni de qué largo. */
 function getSalud(): Response {
   return json({
     ok: true,

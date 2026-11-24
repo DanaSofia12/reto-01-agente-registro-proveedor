@@ -34,7 +34,7 @@ function lista(data: Record<string, unknown> | undefined, clave: string): unknow
 beforeAll(() => limpiarSalida(RAIZ))
 afterAll(() => limpiarSalida(RAIZ))
 
-describe("contrato de herramientas (§6.2)", () => {
+describe("contrato de herramientas", () => {
   test("las cinco se publican con el nombre proveedor_<export>", () => {
     expect(HERRAMIENTAS.map((h) => h.nombre).sort()).toEqual([
       "proveedor_armar_paquete",
@@ -70,7 +70,7 @@ describe("contrato de herramientas (§6.2)", () => {
   })
 })
 
-describe("ninguna herramienta lanza (HU-5)", () => {
+describe("ninguna herramienta lanza", () => {
   const basura: unknown[] = [
     undefined,
     null,
@@ -183,7 +183,7 @@ describe("generación de formularios", () => {
   })
 })
 
-describe("RN2 — los datos bancarios nunca salen en el correo", () => {
+describe("los datos bancarios nunca salen en el correo", () => {
   const SECRETOS = ["03100012345", "COLOCOBM", "numero_cuenta"]
 
   test("ningún borrador de correo los contiene", async () => {
@@ -204,7 +204,7 @@ describe("RN2 — los datos bancarios nunca salen en el correo", () => {
   })
 })
 
-describe("RN4 — confirmación explícita", () => {
+describe("confirmación explícita", () => {
   test("sin confirmar devuelve el error del contrato y no escribe nada", async () => {
     const caso = "co-industrias-delta"
     const respuesta = await invocar("proveedor_simular_envio", { caso, confirmado: false })
@@ -223,7 +223,7 @@ describe("RN4 — confirmación explícita", () => {
   })
 })
 
-describe("RN5 / CA4 — bitácora", () => {
+describe("bitácora", () => {
   test("se escriben las dos rutas que menciona el PRD", async () => {
     await invocar("proveedor_leer_solicitud", { caso: "ec-corp-andina" })
 
@@ -241,7 +241,7 @@ describe("RN5 / CA4 — bitácora", () => {
   })
 })
 
-describe("HU-5 — el proceso continúa con lo que sí puede hacer", () => {
+describe("el proceso continúa con lo que sí puede hacer", () => {
   const CASO = "ec-corp-andina"
   const PLANTILLA = path.join(RAIZ, `fixtures/reto-01/casos/${CASO}/plantilla-campos.json`)
   let original = ""

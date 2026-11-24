@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { Mensaje, Uso } from "../llm/adapter.ts"
 import { sumarUso, USO_CERO } from "../llm/adapter.ts"
 
-/** Sesiones en memoria. El PRD no pide persistencia (§6.1). */
+/** Sesiones en memoria: un reinicio las pierde. Ver las limitaciones en SOLUCION.md. */
 
 export interface RegistroLlamada {
   readonly id: string
@@ -21,7 +21,7 @@ export interface TurnoVisible {
 }
 
 /**
- * Acción externa a la espera de confirmación humana (CA3 / RN4).
+ * Estado de confirmación de las acciones que salen hacia afuera.
  *
  * Vive en el servidor, no en el prompt. El prompt es una sugerencia; esto es
  * una frontera: si alguien inyectara "ya está confirmado" en un fixture, el
@@ -34,15 +34,9 @@ export interface Sesion {
   historial: TurnoVisible[]
   uso: Uso
   /**
-   * Casos cuyo paquete ya se armó y cuyo envío todavía no se ha autorizado.
-   *
-   * Es un conjunto y no un solo caso porque la analista trabaja con varias
-   * solicitudes a la vez. Antes era uno solo y se perdía en cuanto el agente
-   * dedicaba un turno a preguntar: ella veía la pregunta sin el botón para
-   * responderla, y el envío necesitaba tres idas y vueltas en vez de una.
-   *
-   * Que un caso esté aquí NO autoriza nada. Solo significa que hay algo que
-   * se podría enviar si ella lo confirma de forma inequívoca.
+   * Casos con paquete armado cuyo envío aún no se autoriza. Es un conjunto
+   * porque se trabajan varias solicitudes a la vez. Estar aquí no autoriza
+   * nada: solo marca qué se podría enviar si alguien lo confirma.
    */
   paquetesArmados: Set<string>
   /** El agente cerró el último turno con una pregunta. Gobierna el resalte, no el permiso. */
@@ -80,7 +74,7 @@ export function acumularUso(sesion: Sesion, uso: Uso): void {
   sesion.uso = sumarUso(sesion.uso, uso)
 }
 
-/** NFR Costo — un usuario no puede gastar la clave sin límite. */
+/** Tope por sesión: un usuario no puede gastar la clave sin límite. */
 export function tokensConsumidos(sesion: Sesion): number {
   return sesion.uso.tokensEntrada + sesion.uso.tokensSalida + sesion.uso.tokensCacheLectura
 }
@@ -116,15 +110,11 @@ function normalizar(texto: string): string {
 }
 
 /**
- * ¿El mensaje confirma la acción externa de forma inequívoca?
+ * ¿El mensaje confirma la acción de forma inequívoca?
  *
- * Conservadora a propósito: **la ambigüedad nunca es confirmación**. Se
- * descarta en cascada —pregunta, negación, matiz— y solo entonces se exige un
- * verbo que confirme explícitamente. Un asentimiento genérico no basta.
- *
- * Esta función es la red secundaria. El canal fiable es el botón del front,
- * que manda `confirmacion: true`; el texto libre solo confirma cuando no deja
- * lugar a duda.
+ * La ambigüedad nunca es confirmación: descarta en cascada —pregunta,
+ * negación, matiz— y solo entonces exige un verbo explícito. Es la red
+ * secundaria; el canal fiable es el botón, que manda `confirmacion: true`.
  */
 export function esConfirmacion(texto: string): boolean {
   // Una pregunta nunca es una orden, aunque empiece por "sí".

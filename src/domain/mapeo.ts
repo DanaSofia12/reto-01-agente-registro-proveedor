@@ -11,7 +11,7 @@ import type {
 import { formatearValor, leerRuta, type ValorMaestro } from "./valores.ts"
 
 /**
- * HU-2 — Cruza cada campo solicitado con el repositorio maestro.
+ * Cruza cada campo que pide el cliente con el repositorio maestro.
  * Función pura: mismas entradas, mismo resultado. Sin disco, sin red, sin reloj.
  */
 
@@ -126,7 +126,7 @@ export function mapearCampos({ campos, maestro, glosario, pais }: EntradaMapeo):
       continue
     }
 
-    // RN1 — el identificador tributario puede necesitar visto bueno humano.
+    // El identificador tributario puede necesitar visto bueno humano.
     if (candidato.clave === CLAVE_IDENTIFICADOR) {
       const nota = notaIdentificador(pais, campo.etiqueta, normalizar(campo.etiqueta))
       if (nota !== null) {

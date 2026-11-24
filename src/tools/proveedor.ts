@@ -27,9 +27,9 @@ import { generarXlsx } from "../infra/xlsx.ts"
 
 /**
  * Las cinco herramientas del reto. Son la ÚNICA fuente de valores que el
- * agente puede afirmar (CA2).
+ * agente puede afirmar.
  *
- * Contrato (§6.2): cada export es un objeto con `description`, `args` (zod) y
+ * Contrato: cada export es un objeto con `description`, `args` (zod) y
  * `execute`, que devuelve un string JSON `{ ok, data }` o `{ ok: false, error }`
  * y **nunca lanza**. El nombre que ve el modelo es `proveedor_<export>`.
  */
@@ -53,7 +53,7 @@ function fallo(error: string): string {
 /**
  * Convierte cualquier excepción en el mensaje legible del contrato.
  * Los errores del dominio y de los fixtures ya traen texto para humanos; lo
- * inesperado se reporta sin traza cruda (HU-5).
+ * inesperado se reporta sin traza cruda.
  */
 function mensajeDe(causa: unknown): string {
   if (causa instanceof Error && causa.message !== "") return causa.message
@@ -95,7 +95,7 @@ function blindar(
  *
  * Decisión: el mapeo NO viaja por el modelo entre herramientas. Recalcularlo es
  * determinista y barato, y evita que los valores pasen por el contexto del LLM
- * —que es justo lo que CA2 busca impedir—. Ver SOLUCION.md, decisión 1.
+ * —que es justo lo que hay que impedir—. Ver SOLUCION.md, decisión 1.
  */
 interface EstadoCaso {
   solicitud: Solicitud
@@ -106,12 +106,10 @@ interface EstadoCaso {
 }
 
 /**
- * HU-5 — El mapeo se resuelve aparte y puede fallar solo.
+ * El mapeo se resuelve aparte y puede fallar solo.
  *
- * `armar_paquete` no necesita la plantilla para nada: el checklist sale de
- * `soportes-exigidos.json` y del índice de soportes. Si la plantilla está
- * corrupta, el paquete y el checklist se siguen produciendo — que es lo que
- * pide el criterio "el proceso continúa con lo que sí puede hacer".
+ * `armar_paquete` no necesita la plantilla: el checklist sale de los soportes
+ * exigidos y del índice. Si la plantilla está corrupta, el paquete se arma igual.
  */
 function resolverCaso(ctx: ContextoHerramienta, caso: string): EstadoCaso {
   const solicitud = leerSolicitud(ctx.directory, caso)
@@ -375,7 +373,7 @@ export const armar_paquete = {
           })),
           campos_faltantes: checklist.camposFaltantes,
           fecha_referencia: checklist.fechaReferencia,
-          // HU-5: el paquete se arma igual, y se dice qué no se pudo hacer.
+          // El paquete se arma igual, y se dice qué no se pudo hacer.
           advertencia: errorMapeo,
         }),
       }

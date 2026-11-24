@@ -59,7 +59,7 @@ export function obtenerCasos(): Promise<{ casos: ResumenCaso[] }> {
 }
 
 /**
- * `confirmacion` es el canal fiable de CA3: el botón lo manda explícitamente
+ * `confirmacion` es el canal fiable: el botón lo manda explícitamente
  * en vez de confiar en que el servidor interprete bien el texto libre.
  */
 export function enviarMensaje(

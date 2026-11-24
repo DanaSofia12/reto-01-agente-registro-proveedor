@@ -1,7 +1,7 @@
 import type { Pais } from "./tipos.ts"
 
 /**
- * RN1 — El identificador tributario cambia de nombre por país, pero Periferia
+ * El identificador tributario cambia de nombre por país, pero Periferia
  * solo tiene NIT colombiano. Ver src/knowledge/registro-proveedor.md.
  */
 
@@ -18,7 +18,7 @@ export const CLAVE_IDENTIFICADOR = "nit"
 
 /**
  * Etiquetas que piden el identificador tributario sin nombrar el del país.
- * HU-1 pide reportarlas y proponer el equivalente local.
+ * Se reportan para que una persona decida si el cliente las acepta.
  */
 const ETIQUETAS_AMBIGUAS = new Set([
   "identificacion tributaria",

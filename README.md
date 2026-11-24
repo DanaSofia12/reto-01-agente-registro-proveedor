@@ -73,7 +73,7 @@ Todas en `.env.example`. **La clave del modelo solo vive en el entorno del backe
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `LLM_PROVIDER` | `anthropic` | `anthropic`, `openai` o `mock` |
+| `LLM_PROVIDER` | `anthropic` | `anthropic` o `mock` (sin red, para pruebas) |
 | `LLM_MODEL` | `claude-haiku-5-5` | Subir a `claude-sonnet-5-5` no requiere tocar código |
 | `ANTHROPIC_API_KEY` | — | **Requerida** con el proveedor por defecto |
 | `MAX_ITERACIONES_TURNO` | `25` | Tope de ciclos herramienta → modelo (CA1) |
@@ -113,26 +113,51 @@ curl -s -X POST localhost:3000/api/chat \
 
 ## Estructura
 
+Las dependencias van en una sola dirección: `server → agent → tools → domain`.
+`domain/` no importa nada de las capas de arriba, así que las reglas de negocio
+se prueban sin disco, sin red y sin clave.
+
 ```
 reto-01/
-├── agent/prompt.md                 comportamiento del agente
+├── agent/prompt.md          cómo se comporta el agente — texto, no código
 ├── src/
-│   ├── domain/                     reglas puras, sin IO — testeables sin disco
-│   ├── infra/                      lectura de fixtures, escritura, xlsx, pdf, bitácora
-│   ├── tools/proveedor.ts          las 5 herramientas (única fuente de valores)
-│   ├── llm/                        adaptador + anthropic + openai + mock
-│   ├── agent/                      ciclo y sesiones
-│   ├── knowledge/                  conocimiento del proceso
-│   └── server.ts                   API y estáticos
-├── web/                            front de chat (React + Vite)
-├── modulo/                         bonus §9.4 — generado, nunca editado a mano
-├── fixtures/reto-01/               entregado por Periferia · no modificar
-├── scripts/                        verificador de rúbrica y generador del módulo
-├── tests/                          dominio · herramientas · ciclo
-└── demo.ts                         verificación sin modelo
+│   ├── domain/              reglas puras. Sin IO, sin framework, sin dependencias
+│   │   ├── mapeo.ts           cruza los campos del cliente con el maestro
+│   │   ├── vigencias.ts       qué soporte bloquea la firma y cuál no
+│   │   ├── paises.ts          el identificador tributario cambia por país
+│   │   └── etiquetas.ts       identificadores internos → lenguaje de oficina
+│   ├── infra/               todo lo que toca el disco: fixtures, xlsx, pdf, bitácora
+│   ├── tools/proveedor.ts   las 5 herramientas. Única fuente de valores del maestro
+│   ├── llm/                 adaptador + Claude + uno falso para tests
+│   ├── agent/               el bucle y el estado de sesión
+│   ├── knowledge/           el proceso de registro — texto, no código
+│   └── server.ts            API HTTP y archivos estáticos
+├── web/src/                 front de chat (React + Vite)
+│   ├── lenguaje.ts            traduce lo técnico antes de pintarlo
+│   └── componentes/           correo · pasos del agente · expediente · confirmación
+├── modulo/                  portable a otro agente — generado, no editar a mano
+├── fixtures/reto-01/        datos entregados por Periferia — no modificar
+├── scripts/                 verificador de requisitos y generador del módulo
+├── tests/                   dominio · herramientas · bucle del agente
+└── demo.ts                  recorre los 4 casos sin llamar a ningún modelo
 ```
 
-La separación que se evalúa: **comportamiento** en `agent/prompt.md`, **conocimiento** en `src/knowledge/`, **ejecución** en `src/tools/` y `src/domain/`. Cambiar una regla de negocio no toca `server.ts`.
+### Por dónde empezar a leer
+
+| Si quieres entender… | Abre |
+|---|---|
+| Qué hace el agente y cómo habla | [`agent/prompt.md`](./agent/prompt.md) |
+| El bucle: pedir, ejecutar, repetir | [`src/agent/ciclo.ts`](./src/agent/ciclo.ts) |
+| Qué puede hacer y qué no | [`src/tools/proveedor.ts`](./src/tools/proveedor.ts) |
+| Por qué un campo queda vacío | [`src/domain/mapeo.ts`](./src/domain/mapeo.ts) |
+| Por qué no se puede firmar | [`src/domain/vigencias.ts`](./src/domain/vigencias.ts) |
+| Que nada se envía sin permiso | [`src/agent/ciclo.ts`](./src/agent/ciclo.ts) · `ejecutarLlamada` |
+| Cómo se cubre cada requisito | [`scripts/verificar-rubrica.ts`](./scripts/verificar-rubrica.ts) |
+
+Tres cosas viven fuera del código a propósito: el **comportamiento** en
+`agent/prompt.md`, el **conocimiento del proceso** en `src/knowledge/` y los
+**datos** en `fixtures/`. Cambiar una regla de negocio no obliga a tocar
+`server.ts` ni a desplegar de nuevo el front.
 
 ---
 

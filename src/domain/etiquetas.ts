@@ -1,21 +1,15 @@
 /**
- * Traducción de identificadores internos a lenguaje de oficina.
+ * Identificadores internos traducidos a lenguaje de oficina.
  *
- * La analista administrativa no trabaja con `camara_comercio` ni con
- * `co-industrias-delta`: trabaja con «el certificado de existencia» y con
- * «Industrias Delta». Cada vez que un identificador se escapa a la pantalla,
- * la interfaz le pide que piense como la base de datos.
- *
- * El identificador no desaparece —la bitácora y los artefactos lo conservan,
- * que para eso son auditables—, pero deja de ser lo que ella lee.
+ * `camara_comercio` es «el certificado de existencia»; el identificador sigue
+ * en la bitácora y en los artefactos, pero no es lo que se lee en pantalla.
  */
 
 /**
- * Nombre de cada soporte tal como lo pide el cliente en su correo.
+ * Nombre de cada soporte como lo pide el cliente.
  *
- * No sale del índice del repositorio a propósito: un soporte **ausente** no
- * tiene entrada en el índice, y es justo el que hay que nombrar bien, porque
- * es el que bloquea la firma.
+ * No sale del índice del repositorio: un soporte ausente no tiene entrada ahí,
+ * y es justo el que hay que nombrar bien porque es el que bloquea la firma.
  */
 const SOPORTES: Readonly<Record<string, string>> = {
   camara_comercio: "Certificado de existencia y representación legal",

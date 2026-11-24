@@ -129,7 +129,7 @@ export function App() {
             .catch(() => setArtefactos([]))
         }
       } catch (causa) {
-        // CA5 — el error se muestra en el hilo y la sesión sigue viva.
+        // El error se muestra en el hilo y la sesión sigue viva.
         const mensaje =
           causa instanceof Error
             ? causa.message
