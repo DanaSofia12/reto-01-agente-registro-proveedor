@@ -38,7 +38,7 @@ export function Carpeta({
         {pestana}
       </span>
       <span
-        className={`block w-full rounded-b-[15px] rounded-tr-[15px] px-5 pb-5 pt-4 ${piel.cuerpo}`}
+        className={`flex w-full flex-1 flex-col rounded-b-[15px] rounded-tr-[15px] px-5 pb-5 pt-4 ${piel.cuerpo}`}
       >
         {children}
       </span>
@@ -46,28 +46,35 @@ export function Carpeta({
   )
 
   if (onClick === undefined) {
-    return <div className="flex w-full flex-col items-start text-left">{cuerpo}</div>
+    return <div className="flex h-full w-full flex-col items-start text-left">{cuerpo}</div>
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full flex-col items-start text-left transition-opacity hover:opacity-90"
+      className="flex h-full w-full flex-col items-start text-left transition-opacity hover:opacity-90"
     >
       {cuerpo}
     </button>
   )
 }
 
-/** Cifra primero porque es lo que se mira; después qué significa y el matiz. */
+/**
+ * Cifra primero porque es lo que se mira; después qué significa y el matiz.
+ *
+ * Un número corto se pinta enorme; una fecha necesita menos cuerpo o rompe la
+ * caja. El umbral es la longitud, no el tipo: así sirve igual para "4", "13/15"
+ * o "27 de agosto".
+ */
 export function Cifra({ valor, titulo, nota }: { valor: string; titulo: string; nota: string }) {
+  const cuerpo = valor.length <= 5 ? "text-[44px]" : "text-[26px]"
   return (
     <>
-      <span className="block text-[44px] font-bold leading-[0.9] tracking-[-0.05em]">{valor}</span>
-      <span className="mt-2 block text-[17px] font-semibold leading-tight tracking-[-0.028em]">
+      <span className={`block font-bold leading-[0.95] tracking-[-0.04em] ${cuerpo}`}>{valor}</span>
+      <span className="mt-2 block flex-1 text-[17px] font-semibold leading-tight tracking-[-0.028em]">
         {titulo}
       </span>
-      <span className="mt-2 block text-[13px] leading-snug opacity-70">{nota}</span>
+      <span className="mt-3 block text-[13px] leading-snug opacity-70">{nota}</span>
     </>
   )
 }
