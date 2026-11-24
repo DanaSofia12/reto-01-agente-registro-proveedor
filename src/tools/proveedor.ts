@@ -366,6 +366,7 @@ export const armar_paquete = {
           soportes_copiados: copiados,
           checklist: checklist.items.map((i) => ({
             tipo: i.tipo,
+            nombre: i.nombre,
             estado: i.estado,
             vigencia_hasta: i.vigenciaHasta,
             dias_restantes: i.diasRestantes,

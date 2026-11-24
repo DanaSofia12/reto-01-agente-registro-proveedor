@@ -476,3 +476,50 @@ describe("la pregunta sobrevive a un turno sin herramientas", () => {
     expect(existsSync(path.join(RAIZ, "out/co-industrias-delta/ENVIO-SIMULADO.md"))).toBe(false)
   })
 })
+
+describe("el agente sabe qué solicitud está abierta en pantalla", () => {
+  /**
+   * El defecto: la analista tenía Industrias Delta abierta, dijo «genera el
+   * documento y arma el paquete», y el agente le preguntó de qué cliente
+   * hablaba. No tenía forma de saber que «Industrias Delta» se guarda como
+   * `co-industrias-delta`, así que lo preguntaba todo.
+   */
+  test("el contexto de pantalla llega al modelo, no al historial visible", async () => {
+    const vistos: string[] = []
+    const proveedor = {
+      async enviar(mensajes: { rol: string; texto?: string }[]) {
+        for (const m of mensajes) {
+          if (m.rol === "usuario" && m.texto !== undefined) vistos.push(m.texto)
+        }
+        return { texto: "Listo.", llamadas: [], uso: { entrada: 0, salida: 0, cacheLectura: 0 } }
+      },
+    }
+    const ejecutar = crearCiclo({ raiz: RAIZ, proveedor })
+    const sesion = crearSesion("pantalla")
+    await ejecutar(sesion, "genera el documento", false, "co-industrias-delta")
+
+    const alModelo = vistos.join("\n")
+    expect(alModelo).toContain("co-industrias-delta")
+    expect(alModelo).toContain("Industrias Delta")
+    expect(alModelo).toContain("genera el documento")
+
+    // Lo que ella ve en el hilo es solo lo que escribió.
+    const suyo = sesion.historial.find((h) => h.rol === "usuario")
+    expect(suyo?.texto).toBe("genera el documento")
+  })
+
+  test("sin solicitud abierta, el contexto lo dice en vez de callarlo", async () => {
+    const vistos: string[] = []
+    const proveedor = {
+      async enviar(mensajes: { rol: string; texto?: string }[]) {
+        for (const m of mensajes) {
+          if (m.rol === "usuario" && m.texto !== undefined) vistos.push(m.texto)
+        }
+        return { texto: "¿De cuál?", llamadas: [], uso: { entrada: 0, salida: 0, cacheLectura: 0 } }
+      },
+    }
+    const ejecutar = crearCiclo({ raiz: RAIZ, proveedor })
+    await ejecutar(crearSesion("sin-pantalla"), "envíalo")
+    expect(vistos.join("\n")).toContain("no tiene ninguna solicitud abierta")
+  })
+})

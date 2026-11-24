@@ -115,7 +115,7 @@ export function App() {
       ])
 
       try {
-        const respuesta = await enviarMensaje(sessionId, limpio, confirmacion)
+        const respuesta = await enviarMensaje(sessionId, limpio, confirmacion, caso)
         setSessionId(respuesta.sessionId)
         setNecesitaConfirmacion(respuesta.needsConfirmation)
 

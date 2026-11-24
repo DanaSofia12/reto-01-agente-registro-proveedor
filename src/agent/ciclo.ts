@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { config, fechaReferencia } from "../config.ts"
 import type { ContextoHerramienta } from "../domain/tipos.ts"
+import { leerSolicitud } from "../infra/fixtures.ts"
+import { casosDisponibles } from "../infra/rutas.ts"
 import {
   ErrorProveedor,
   type HerramientaLLM,
@@ -63,6 +65,25 @@ export interface ResultadoTurno {
   readonly iteraciones: number
 }
 
+/**
+ * Las solicitudes que hay, con el nombre del cliente al lado del identificador.
+ *
+ * Sin esto el agente tenía que adivinar que «Industrias Delta» se guarda como
+ * `co-industrias-delta`, y acababa preguntando de qué cliente hablábamos aunque
+ * la analista lo tuviera abierto en pantalla.
+ */
+function catalogoDeSolicitudes(raiz: string): string {
+  const filas = casosDisponibles(raiz).map((caso) => {
+    try {
+      const s = leerSolicitud(raiz, caso)
+      return `- ${s.cliente} — identificador: ${caso}`
+    } catch {
+      return `- (solicitud ilegible) — identificador: ${caso}`
+    }
+  })
+  return filas.join("\n")
+}
+
 export interface OpcionesCiclo {
   readonly raiz: string
   readonly proveedor: ProveedorLLM
@@ -93,11 +114,34 @@ function resumirResultado(crudo: string): { ok: boolean; resumen: string; datos:
 
 export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
   const sistema = cargarSistema(raiz)
+  const catalogo = catalogoDeSolicitudes(raiz)
+
+  /**
+   * Lo que el agente necesita saber del estado de la pantalla.
+   *
+   * Va dentro del mensaje del usuario y no en el prompt de sistema: el prefijo
+   * del sistema tiene que ser idéntico byte a byte en cada petición o el caché
+   * deja de servir.
+   */
+  function contexto(casoAbierto: string | null): string {
+    const abierta =
+      casoAbierto === null
+        ? "La analista no tiene ninguna solicitud abierta en pantalla."
+        : `La analista tiene abierta la solicitud cuyo identificador es ${casoAbierto}. Si habla sin nombrar cliente, se refiere a esa.`
+    return [
+      "[Contexto de la pantalla, no se lo muestres ni lo menciones]",
+      abierta,
+      "Solicitudes disponibles:",
+      catalogo,
+      "[Fin del contexto]",
+    ].join("\n")
+  }
 
   return async function ejecutarTurno(
     sesion: Sesion,
     mensaje: string,
     confirmacionExplicita = false,
+    casoAbierto: string | null = null,
   ): Promise<ResultadoTurno> {
     const ctx: ContextoHerramienta = {
       directory: raiz,
@@ -116,7 +160,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     const confirmadoAhora =
       autorizables.size > 0 && (confirmacionExplicita || esConfirmacion(mensaje))
 
-    sesion.mensajes.push({ rol: "usuario", texto: mensaje })
+    sesion.mensajes.push({ rol: "usuario", texto: `${contexto(casoAbierto)}\n\n${mensaje}` })
     sesion.historial.push({
       rol: "usuario",
       texto: mensaje,

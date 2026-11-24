@@ -77,11 +77,12 @@ export function enviarMensaje(
   sessionId: string | null,
   message: string,
   confirmacion = false,
+  caso: string | null = null,
 ): Promise<RespuestaChat> {
   return pedir<RespuestaChat>("/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sessionId, message, confirmacion }),
+    body: JSON.stringify({ sessionId, message, confirmacion, caso }),
   })
 }
 

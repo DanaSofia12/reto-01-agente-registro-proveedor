@@ -92,7 +92,13 @@ function excedeLimite(origen: string): boolean {
 // ─── Rutas ────────────────────────────────────────────────────────────────────
 
 async function postChat(peticion: Request, servidor: Bun.Server<undefined>): Promise<Response> {
-  let cuerpo: { sessionId?: string; message?: string; confirmacion?: boolean }
+  let cuerpo: {
+    sessionId?: string
+    message?: string
+    confirmacion?: boolean
+    /** Solicitud abierta en pantalla, para que el agente no pregunte de cuál hablamos. */
+    caso?: string
+  }
   try {
     cuerpo = (await peticion.json()) as typeof cuerpo
   } catch {
@@ -122,7 +128,9 @@ async function postChat(peticion: Request, servidor: Bun.Server<undefined>): Pro
   }
 
   try {
-    return json(await cicloListo(sesion, mensaje, cuerpo.confirmacion === true))
+    const abierto =
+      typeof cuerpo.caso === "string" && /^[a-z0-9-]+$/.test(cuerpo.caso) ? cuerpo.caso : null
+    return json(await cicloListo(sesion, mensaje, cuerpo.confirmacion === true, abierto))
   } catch (causa) {
     // Última red: ni un fallo inesperado mata la sesión.
     const texto = causa instanceof Error ? causa.message : "error inesperado en el ciclo del agente"
