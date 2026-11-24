@@ -209,11 +209,22 @@ function getArtefactos(caso: string): Response {
   }
 }
 
+/**
+ * Markdown, texto plano y JSONL se sirven como `text/plain` para que el visor
+ * los muestre en vez de que el navegador los descargue. El resto conserva el
+ * tipo que Bun deduce de la extensión.
+ */
+const COMO_TEXTO = /\.(md|txt|jsonl|json|csv)$/
+
 function getArchivo(caso: string, relativo: string): Response {
   try {
     const destino = rutaSalida(RAIZ, caso, relativo)
     if (!existsSync(destino)) return error("archivo no encontrado", 404)
-    return new Response(Bun.file(destino))
+    const archivo = Bun.file(destino)
+    if (!COMO_TEXTO.test(relativo)) return new Response(archivo)
+    return new Response(archivo, {
+      headers: { "content-type": "text/plain; charset=utf-8", ...CORS },
+    })
   } catch {
     return error("ruta inválida", 400)
   }

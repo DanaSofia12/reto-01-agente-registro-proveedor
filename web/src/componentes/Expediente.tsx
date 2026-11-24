@@ -1,5 +1,5 @@
+import { useState } from "react"
 import type { RegistroLlamada } from "../api.ts"
-import { urlArchivo } from "../api.ts"
 import {
   type ItemSoporte,
   lista,
@@ -9,6 +9,7 @@ import {
   vigenciaDe,
 } from "../lenguaje.ts"
 import { Avatar, type EstadoSolicitud } from "./Avatar.tsx"
+import { type CampoEscrito, VisorDocumento } from "./VisorDocumento.tsx"
 
 /**
  * El expediente: la evidencia de lo que el agente afirma en el hilo.
@@ -21,6 +22,11 @@ interface CampoPendiente {
   readonly etiqueta: string
   readonly nota?: string
   readonly motivo?: string
+}
+
+interface CampoLleno {
+  readonly etiqueta: string
+  readonly valor: string
 }
 
 const TINTE: Readonly<Record<string, string>> = {
@@ -42,11 +48,13 @@ export function Expediente({
   llamadas: readonly RegistroLlamada[]
   artefactos: readonly string[]
 }) {
+  const [viendo, setViendo] = useState<string | null>(null)
   const solicitud = ultimoResultado(llamadas, "proveedor_leer_solicitud")
   const mapeo = ultimoResultado(llamadas, "proveedor_mapear_campos")
   const paquete = ultimoResultado(llamadas, "proveedor_armar_paquete")
 
-  const llenos = lista(mapeo, "llenos").length
+  const camposLlenos = lista<CampoLleno>(mapeo, "llenos")
+  const llenos = camposLlenos.length
   const porConfirmar = lista<CampoPendiente>(mapeo, "requiere_confirmacion")
   const faltantes = lista<CampoPendiente>(mapeo, "faltantes")
   const total = llenos + porConfirmar.length + faltantes.length
@@ -172,23 +180,35 @@ export function Expediente({
 
       {artefactos.length > 0 && caso !== null && (
         <section>
-          <Rotulo>Documentos listos</Rotulo>
+          <Rotulo>Documentos generados</Rotulo>
+          <p className="m-0 -mt-1 mb-2.5 text-[11.5px] leading-snug text-tenue">
+            Salen de la plantilla que mandó el cliente, llenada con el repositorio de Periferia.
+            Toca cualquiera para verlo.
+          </p>
           <ul className="m-0 list-none p-0">
             {artefactos.map((a) => (
               <li key={a}>
-                <a
-                  href={urlArchivo(caso, a)}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setViendo(a)}
                   title={a}
-                  className="-ml-3 block truncate rounded-[10px] px-3 py-1.5 text-[13px] no-underline hover:bg-lima"
+                  className="-ml-3 block w-full truncate rounded-[10px] px-3 py-1.5 text-left text-[13px] hover:bg-lima"
                 >
                   {nombreArtefacto(a)}
-                </a>
+                </button>
               </li>
             ))}
           </ul>
         </section>
+      )}
+
+      {viendo !== null && caso !== null && (
+        <VisorDocumento
+          caso={caso}
+          ruta={viendo}
+          camposEscritos={camposLlenos as readonly CampoEscrito[]}
+          onCerrar={() => setViendo(null)}
+        />
       )}
     </aside>
   )

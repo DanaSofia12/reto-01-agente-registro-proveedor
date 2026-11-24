@@ -4,6 +4,7 @@ import path from "node:path"
 import { crearCiclo } from "../src/agent/ciclo.ts"
 import { crearSesion, esConfirmacion } from "../src/agent/sesion.ts"
 import { limpiarSalida } from "../src/infra/salida.ts"
+import type { ProveedorLLM } from "../src/llm/adapter.ts"
 import { crearProveedorMock, type GuionTurno } from "../src/llm/mock.ts"
 
 /**
@@ -486,12 +487,23 @@ describe("el agente sabe qué solicitud está abierta en pantalla", () => {
    */
   test("el contexto de pantalla llega al modelo, no al historial visible", async () => {
     const vistos: string[] = []
-    const proveedor = {
-      async enviar(mensajes: { rol: string; texto?: string }[]) {
+    const proveedor: ProveedorLLM = {
+      nombre: "espia",
+      modelo: "espia",
+      async enviar(mensajes) {
         for (const m of mensajes) {
-          if (m.rol === "usuario" && m.texto !== undefined) vistos.push(m.texto)
+          if (m.rol === "usuario") vistos.push(m.texto)
         }
-        return { texto: "Listo.", llamadas: [], uso: { entrada: 0, salida: 0, cacheLectura: 0 } }
+        return {
+          texto: "Listo.",
+          llamadas: [],
+          uso: {
+            tokensEntrada: 0,
+            tokensSalida: 0,
+            tokensCacheLectura: 0,
+            tokensCacheEscritura: 0,
+          },
+        }
       },
     }
     const ejecutar = crearCiclo({ raiz: RAIZ, proveedor })
@@ -510,12 +522,23 @@ describe("el agente sabe qué solicitud está abierta en pantalla", () => {
 
   test("sin solicitud abierta, el contexto lo dice en vez de callarlo", async () => {
     const vistos: string[] = []
-    const proveedor = {
-      async enviar(mensajes: { rol: string; texto?: string }[]) {
+    const proveedor: ProveedorLLM = {
+      nombre: "espia",
+      modelo: "espia",
+      async enviar(mensajes) {
         for (const m of mensajes) {
-          if (m.rol === "usuario" && m.texto !== undefined) vistos.push(m.texto)
+          if (m.rol === "usuario") vistos.push(m.texto)
         }
-        return { texto: "¿De cuál?", llamadas: [], uso: { entrada: 0, salida: 0, cacheLectura: 0 } }
+        return {
+          texto: "¿De cuál?",
+          llamadas: [],
+          uso: {
+            tokensEntrada: 0,
+            tokensSalida: 0,
+            tokensCacheLectura: 0,
+            tokensCacheEscritura: 0,
+          },
+        }
       },
     }
     const ejecutar = crearCiclo({ raiz: RAIZ, proveedor })

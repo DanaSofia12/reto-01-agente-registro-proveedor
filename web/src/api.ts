@@ -90,6 +90,13 @@ export function obtenerArtefactos(caso: string): Promise<{ caso: string; artefac
   return pedir<{ caso: string; artefactos: string[] }>(`/api/artefactos/${caso}`)
 }
 
+/** Contenido de un documento generado, para mostrarlo dentro de la aplicación. */
+export async function leerTexto(caso: string, relativo: string): Promise<string> {
+  const respuesta = await fetch(urlArchivo(caso, relativo))
+  if (!respuesta.ok) throw new Error("no se pudo leer el documento")
+  return respuesta.text()
+}
+
 export function urlArchivo(caso: string, relativo: string): string {
   return `/api/archivos/${caso}/${relativo.split("/").map(encodeURIComponent).join("/")}`
 }
