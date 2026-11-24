@@ -406,6 +406,19 @@ const CRITERIOS: readonly Criterio[] = [
     },
   },
 
+  {
+    id: "D9",
+    descripcion: "SOLUCION.md no describe identificadores que ya no existen en el codigo",
+    comprobar: () => {
+      // El documento decia `sesion.pendiente` meses despues de que el campo se
+      // renombrara. En una defensa, citar algo que no existe cuesta caro.
+      const doc = contenido("SOLUCION.md")
+      const sesion = contenido("src/agent/sesion.ts")
+      const citados = [...doc.matchAll(/`sesion\.([a-zA-Z]+)`/g)].map((m) => m[1])
+      return citados.every((campo) => campo !== undefined && sesion.includes(`${campo}`))
+    },
+  },
+
   // ─── E · HU-5 · continuar con lo que sí se puede ────────────────────────────
   {
     id: "E1",

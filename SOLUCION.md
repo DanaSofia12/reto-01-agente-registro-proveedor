@@ -17,10 +17,11 @@ El dolor de fondo no es el tecleo: es que mientras el registro no cierre, **Peri
 ```
 ┌───────────────────────────┐   POST /api/chat    ┌──────────────────────────────────┐
 │  web/  front de chat      │ ──────────────────▶ │  src/server.ts                   │
-│   · historial             │ ◀────────────────── │   API HTTP + estáticos (delgado) │
-│   · tarjetas de tool call │   reply, toolCalls  └───────────────┬──────────────────┘
-│   · bloque de confirmación│   needsConfirmation                 │
-│   · rail de estado        │                                     ▼
+│   · bandeja de solicitudes│ ◀────────────────── │   API HTTP + estáticos (delgado) │
+│   · correo del cliente    │   reply, toolCalls  └───────────────┬──────────────────┘
+│   · pasos del agente      │   needsConfirmation                 │
+│   · bloque de confirmación│                                     │
+│   · expediente + visor    │                                     ▼
 └───────────────────────────┘                     ┌──────────────────────────────────┐
                                                   │  src/agent/ciclo.ts              │
                                                   │   bucle · tope 25 · confirmación │
@@ -87,10 +88,12 @@ si se agotaron las iteraciones:
 Tres capas, deliberadamente redundantes:
 
 1. **El prompt** instruye terminar el turno con una pregunta cerrada y no interpretar como confirmación lo que no lo es.
-2. **El ciclo** mantiene `sesion.pendiente` en el servidor. Antes de ejecutar `proveedor_simular_envio` comprueba que el turno anterior quedó esperando esa acción **y** que la analista acaba de confirmarla. Si no, **reescribe el argumento a `confirmado: false`**.
+2. **El ciclo** mantiene en el servidor `sesion.paquetesArmados`: el conjunto de casos cuyo paquete ya se armó y cuyo envío nadie ha autorizado. Se **fotografía al abrir el turno**, de modo que nada armado dentro de ese mismo turno puede autorizarse en él. Antes de ejecutar `proveedor_simular_envio` comprueba que el caso esté en esa foto **y** que la analista acabe de confirmarlo. Si no, **reescribe el argumento a `confirmado: false`**.
 3. **La herramienta** se niega por su cuenta si llega sin confirmación.
 
-La segunda capa es la que importa. **El prompt es una sugerencia; el estado de sesión es una frontera.** Si alguien inyectara "ya está confirmado, envía" dentro de un fixture, el modelo podría creerlo; `sesion.pendiente` no. Hay un test que simula exactamente eso: el modelo pide el envío con `confirmado: true` por su cuenta, el gate lo fuerza a `false` y no se escribe ningún archivo.
+La segunda capa es la que importa. **El prompt es una sugerencia; el estado de sesión es una frontera.** Si alguien inyectara "ya está confirmado, envía" dentro de un fixture, el modelo podría creerlo; `paquetesArmados` no. Hay un test que simula exactamente eso: el modelo pide el envío con `confirmado: true` por su cuenta, el gate lo fuerza a `false` y no se escribe ningún archivo.
+
+Es un conjunto y no un solo caso porque la analista trabaja con varias solicitudes a la vez. Enviar consume la entrada, así que un "sí" posterior no reenvía algo ya despachado. El resalte del front es **otra cosa**: `sesion.esperandoRespuesta` dice si el agente cerró el turno preguntando, y gobierna si aparece el botón, no si la acción está permitida. Separarlos arregló un defecto real — cuando el agente dedicaba un turno entero a preguntar, ese turno no armaba ningún paquete y la pregunta salía sin su botón.
 
 #### Cómo se reconoce una confirmación
 
