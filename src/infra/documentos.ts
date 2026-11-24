@@ -1,3 +1,4 @@
+import { fechaLarga, nombrePais } from "../domain/etiquetas.ts"
 import type { Checklist, Mapeo, Solicitud } from "../domain/tipos.ts"
 import { campos } from "../domain/tipos.ts"
 
@@ -10,22 +11,43 @@ function esBancario(origen: string | null | undefined): boolean {
   return typeof origen === "string" && origen.startsWith(PREFIJO_BANCARIO)
 }
 
+/**
+ * Estos documentos los lee la analista y el representante legal, no un
+ * programador: el identificador del caso no aparece en ellos.
+ */
 function titulo(solicitud: Solicitud): string {
-  return `${solicitud.cliente} — ${solicitud.id}`
+  return solicitud.cliente
+}
+
+const FORMATO: Readonly<Record<string, string>> = {
+  xlsx: "plantilla de Excel",
+  pdf: "formulario PDF",
+  portal: "portal web del cliente",
+}
+
+function comoLoPide(solicitud: Solicitud): string {
+  return FORMATO[solicitud.formato] ?? solicitud.formato
 }
 
 // ─── Reporte de faltantes (O2) ────────────────────────────────────────────────
 
 export function faltantesMd(solicitud: Solicitud, mapeo: Mapeo): string {
   const lineas = [
-    `# Campos sin dato — ${titulo(solicitud)}`,
+    `# Qué falta para responderle a ${titulo(solicitud)}`,
     "",
-    `Formato solicitado: \`${solicitud.formato}\` · País del cliente: ${solicitud.pais}`,
+    `Pide una ${comoLoPide(solicitud)}. Cliente de ${nombrePais(solicitud.pais)}.`,
     "",
   ]
 
-  if (mapeo.faltantes.length === 0) {
-    lineas.push("Todos los campos solicitados tienen dato en el repositorio maestro.", "")
+  if (mapeo.faltantes.length === 0 && mapeo.requiere_confirmacion.length === 0) {
+    lineas.push(
+      "## No falta nada",
+      "",
+      `Los ${mapeo.llenos.length} campos que pide el cliente tienen dato registrado en Periferia. No hay que pedirle nada a nadie antes de firmar.`,
+      "",
+    )
+  } else if (mapeo.faltantes.length === 0) {
+    lineas.push("Ningún campo quedó vacío. Hay campos que necesitan tu visto bueno, abajo.", "")
   } else {
     lineas.push(
       `## ${mapeo.faltantes.length} campo(s) sin fuente`,
@@ -79,11 +101,11 @@ const ETIQUETA_ESTADO: Readonly<Record<string, string>> = {
 export function checklistMd(solicitud: Solicitud, checklist: Checklist): string {
   const bloqueos = checklist.items.filter((i) => i.bloquea)
   const lineas = [
-    `# Checklist para firma — ${titulo(solicitud)}`,
+    `# Lista de verificación para la firma — ${titulo(solicitud)}`,
     "",
-    `Evaluado contra la fecha **${checklist.fechaReferencia}**.`,
+    `Vigencias evaluadas al **${fechaLarga(checklist.fechaReferencia)}**.`,
     "",
-    checklist.listoParaFirma ? "## Estado: listo para firma" : "## Estado: NO listo para firma",
+    checklist.listoParaFirma ? "## Puede firmarse" : "## No puede firmarse todavía",
     "",
   ]
 
@@ -92,9 +114,9 @@ export function checklistMd(solicitud: Solicitud, checklist: Checklist): string 
     for (const item of bloqueos) {
       const motivo =
         item.estado === "ausente"
-          ? "no existe en el repositorio de soportes"
-          : `venció el ${item.vigenciaHasta}`
-      lineas.push(`- \`${item.tipo}\` — ${motivo}`)
+          ? "Periferia no lo tiene; hay que tramitarlo"
+          : `venció el ${item.vigenciaHasta === null ? "—" : fechaLarga(item.vigenciaHasta)}`
+      lineas.push(`- **${item.nombre}** — ${motivo}`)
     }
     lineas.push("")
   }
@@ -102,19 +124,20 @@ export function checklistMd(solicitud: Solicitud, checklist: Checklist): string 
   lineas.push(
     "## Soportes exigidos por el cliente",
     "",
-    "| Soporte | Estado | Vigencia | Días |",
-    "|---|---|---|---|",
+    "| Soporte | Estado | Vigencia |",
+    "|---|---|---|",
   )
   for (const item of checklist.items) {
     const estado = ETIQUETA_ESTADO[item.estado] ?? item.estado
-    const vigencia = item.vigenciaHasta ?? "sin vencimiento"
-    const dias =
-      item.diasRestantes === null
-        ? "—"
-        : item.diasRestantes < 0
-          ? `vencido hace ${Math.abs(item.diasRestantes)}`
-          : `${item.diasRestantes}`
-    lineas.push(`| \`${item.tipo}\` | ${estado} | ${vigencia} | ${dias} |`)
+    const vigencia =
+      item.vigenciaHasta === null
+        ? "no vence"
+        : item.diasRestantes !== null && item.diasRestantes < 0
+          ? `venció el ${fechaLarga(item.vigenciaHasta)}`
+          : item.diasRestantes !== null && item.diasRestantes <= 30
+            ? `vence el ${fechaLarga(item.vigenciaHasta)} · quedan ${item.diasRestantes} días`
+            : `vence el ${fechaLarga(item.vigenciaHasta)}`
+    lineas.push(`| ${item.nombre} | ${estado} | ${vigencia} |`)
   }
   lineas.push("")
 

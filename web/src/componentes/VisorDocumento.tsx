@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { leerTexto, urlArchivo } from "../api.ts"
-import { nombreArtefacto } from "../lenguaje.ts"
+import { nombreArtefacto, propositoArtefacto } from "../lenguaje.ts"
 
 /**
  * Mirar un documento sin salir de la aplicación.
@@ -109,6 +109,12 @@ export function VisorDocumento({
             </svg>
           </button>
         </header>
+
+        {propositoArtefacto(ruta) !== null && (
+          <p className="m-0 shrink-0 border-b border-pelo bg-nube px-5 py-2.5 text-[12.5px] leading-snug text-prosa">
+            {propositoArtefacto(ruta)}
+          </p>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {clase === "pdf" && (

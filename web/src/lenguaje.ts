@@ -208,6 +208,29 @@ const ARTEFACTOS: Readonly<Record<string, string>> = {
   "paquete/borrador-correo.md": "Borrador del correo de respuesta",
 }
 
+/** Para qué sirve cada documento y quién lo usa. Sin esto, el visor solo da un nombre. */
+const PROPOSITOS: Readonly<Record<string, string>> = {
+  "formulario.xlsx": "La plantilla del cliente, ya diligenciada con los datos de Periferia.",
+  "formulario.pdf": "El formulario del cliente, ya diligenciado con los datos de Periferia.",
+  "faltantes.md":
+    "Los campos que el repositorio de Periferia no tiene, para saber a quién pedírselos.",
+  "log.jsonl": "Cada paso que dio el agente, con su resultado. Sirve para auditar.",
+  "ENVIO-SIMULADO.md": "Constancia de que autorizaste el envío. No sale ningún correo.",
+  "paquete/checklist.md": "Qué soportes están, cuáles vencen pronto y si ya se puede firmar.",
+  "paquete/borrador-correo.md":
+    "El texto para responderle al cliente. Nunca lleva datos bancarios.",
+  "valores-portal.md":
+    "Los valores listos para copiar en el portal del cliente, que se diligencia a mano.",
+}
+
+export function propositoArtefacto(ruta: string): string | null {
+  const conocido = PROPOSITOS[ruta]
+  if (conocido !== undefined) return conocido
+  if (ruta.startsWith("paquete/"))
+    return "Copia del soporte que exige el cliente, adjunta al paquete."
+  return null
+}
+
 export function nombreArtefacto(ruta: string): string {
   const conocido = ARTEFACTOS[ruta]
   if (conocido !== undefined) return conocido
