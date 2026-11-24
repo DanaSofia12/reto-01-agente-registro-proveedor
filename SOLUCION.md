@@ -197,8 +197,6 @@ Las cuatro filas en negrita **no se mueven en ninguna fase**, incluida la de la 
 
 **La recomendación no es la opción más automatizada, y es deliberado.** Con este volumen el cuello de botella no es teclear: es conseguir soportes vigentes y la firma. Automatizar el portal optimiza el tramo que menos pesa, a cambio del riesgo más alto del sistema.
 
-Documento extendido: [`docs/diseno-portal-web.md`](./docs/diseno-portal-web.md).
-
 ---
 
 ## 6. Decisiones y trade-offs
