@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
+import { fechaLarga, nombrePais, nombreSoporte } from "../src/domain/etiquetas.ts"
 import { mapearCampos, PISO_CANDIDATO, UMBRAL_CONFIANZA } from "../src/domain/mapeo.ts"
 import { identificadorDe, notaIdentificador } from "../src/domain/paises.ts"
 import { normalizar, similitud } from "../src/domain/texto.ts"
 import type { CampoSolicitado } from "../src/domain/tipos.ts"
 import { formatearValor, leerRuta } from "../src/domain/valores.ts"
 import { construirChecklist, evaluarSoporte } from "../src/domain/vigencias.ts"
-import { leerGlosario, leerMaestro } from "../src/infra/fixtures.ts"
+import { leerGlosario, leerMaestro, leerSoportesExigidos } from "../src/infra/fixtures.ts"
+import { casosDisponibles } from "../src/infra/rutas.ts"
 
 const RAIZ = new URL("..", import.meta.url).pathname
 const MAESTRO = leerMaestro(RAIZ)
@@ -233,5 +235,56 @@ describe("RN3 — qué bloquea la firma", () => {
     })
     expect(checklist.listoParaFirma).toBe(true)
     expect(checklist.camposFaltantes).toContain("Referencias comerciales")
+  })
+})
+
+describe("etiquetas — nada de identificadores en pantalla", () => {
+  test("cada soporte que algún cliente exige tiene nombre humano", () => {
+    const exigidos = new Set<string>()
+    for (const caso of casosDisponibles(RAIZ)) {
+      for (const tipo of leerSoportesExigidos(RAIZ, caso)) exigidos.add(tipo)
+    }
+    expect(exigidos.size).toBeGreaterThan(0)
+
+    for (const tipo of exigidos) {
+      const nombre = nombreSoporte(tipo)
+      // Si el nombre todavía trae guiones bajos, es el identificador crudo.
+      expect(nombre).not.toContain("_")
+      expect(nombre).not.toBe(tipo)
+      expect(nombre[0]).toBe(nombre[0]?.toUpperCase())
+    }
+  })
+
+  test("el soporte ausente también tiene nombre — es el que bloquea la firma", () => {
+    // No está en el índice del repositorio, así que no puede salir de ahí.
+    expect(nombreSoporte("certificado_cumplimiento_tributario")).toBe(
+      "Certificado de cumplimiento tributario",
+    )
+  })
+
+  test("un tipo desconocido se humaniza en vez de mostrarse crudo", () => {
+    expect(nombreSoporte("certificado_de_algo_nuevo")).toBe("Certificado de algo nuevo")
+  })
+
+  test("el checklist carga el nombre humano junto al identificador", () => {
+    const item = evaluarSoporte("camara_comercio", undefined, new Date("2026-09-03T00:00:00Z"))
+    expect(item.tipo).toBe("camara_comercio")
+    expect(item.nombre).toBe("Certificado de existencia y representación legal")
+  })
+
+  test("las fechas se escriben como se hablan", () => {
+    expect(fechaLarga("2026-09-30")).toBe("30 de septiembre de 2026")
+    expect(fechaLarga("2027-03-31")).toBe("31 de marzo de 2027")
+  })
+
+  test("fechaLarga devuelve la entrada si no es una fecha", () => {
+    expect(fechaLarga("sin vencimiento")).toBe("sin vencimiento")
+    expect(fechaLarga("2026-13-01")).toBe("2026-13-01")
+  })
+
+  test("los países se nombran, no se abrevian", () => {
+    expect(nombrePais("EC")).toBe("Ecuador")
+    expect(nombrePais("ec")).toBe("Ecuador")
+    expect(nombrePais("XX")).toBe("XX")
   })
 })

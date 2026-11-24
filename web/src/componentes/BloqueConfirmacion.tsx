@@ -1,58 +1,52 @@
 /**
- * CA3 — El estado de confirmación se resalta.
+ * El momento en que la decisión pasa de la máquina a la persona.
  *
- * Es el único sitio donde el diseño gasta peso visual: rompe el ritmo del hilo
- * con borde grueso y fondo propio, porque es el momento en que la decisión
- * pasa de la máquina a la persona.
+ * Es el único sitio donde el diseño gasta peso visual. Y es la única vía por
+ * la que una acción hacia afuera queda autorizada: el botón manda la
+ * confirmación por un canal aparte, sin depender de que el servidor adivine
+ * bien si «ok, gracias» significaba que sí.
+ *
+ * El texto nunca le pide teclear una fórmula. Ella decide con un clic o
+ * responde como hable.
  */
 export function BloqueConfirmacion({
-  caso,
+  cliente,
   onResponder,
   deshabilitado,
 }: {
-  caso: string | null
+  cliente: string | null
   onResponder: (texto: string, confirmacion?: boolean) => void
   deshabilitado: boolean
 }) {
+  const aQuien = cliente === null ? "este cliente" : cliente
+
   return (
     <section
-      aria-label="El agente necesita tu confirmación"
-      className="rounded-xl border-2 border-acento-regla bg-acento-suave px-4 py-3.5"
+      aria-label="El agente espera tu decisión"
+      className="rounded-sm border border-acento-regla border-l-[3px] border-l-acento bg-acento-suave px-4 py-3.5"
     >
-      <div className="flex items-start gap-2.5">
-        <span aria-hidden="true" className="mt-[7px] h-2 w-2 shrink-0 rounded-full bg-acento" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium text-acento">
-            El agente se detuvo y espera tu decisión
-          </p>
-          <p className="mt-0.5 text-[13px] leading-snug text-acento/85">
-            No ejecutará ninguna acción externa hasta que confirmes.
-            {caso !== null && (
-              <>
-                {" "}
-                Caso <span className="dato">{caso}</span>.
-              </>
-            )}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={deshabilitado}
-              onClick={() => onResponder("Sí, confirmo. Prepara el envío simulado.", true)}
-              className="rounded-md border border-acento bg-acento px-3 py-1.5 text-[13px] text-white transition-colors hover:bg-acento/90 disabled:opacity-50"
-            >
-              Confirmar envío
-            </button>
-            <button
-              type="button"
-              disabled={deshabilitado}
-              onClick={() => onResponder("No todavía. ¿Qué falta antes de poder enviar?")}
-              className="rounded-md border border-acento-regla bg-superficie px-3 py-1.5 text-[13px] text-acento transition-colors hover:bg-hueco disabled:opacity-50"
-            >
-              Todavía no
-            </button>
-          </div>
-        </div>
+      <p className="text-[14.5px] font-medium leading-snug">El agente se detuvo aquí</p>
+      <p className="mt-0.5 text-[13px] leading-snug text-tenue">
+        No va a hacer nada hacia afuera sin que tú lo decidas. Nada sale hacia {aQuien} por este
+        medio: el correo lo sigue mandando una persona.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={deshabilitado}
+          onClick={() => onResponder("Sí, adelante.", true)}
+          className="rounded-sm border border-acento bg-acento px-3.5 py-1.5 text-[13.5px] font-medium text-white transition-colors hover:bg-[#332c7a] disabled:opacity-50"
+        >
+          Sí, adelante
+        </button>
+        <button
+          type="button"
+          disabled={deshabilitado}
+          onClick={() => onResponder("Todavía no. ¿Qué falta antes de poder seguir?")}
+          className="rounded-sm border border-regla-fuerte bg-superficie px-3.5 py-1.5 text-[13.5px] transition-colors hover:bg-hueco disabled:opacity-50"
+        >
+          Todavía no
+        </button>
       </div>
     </section>
   )

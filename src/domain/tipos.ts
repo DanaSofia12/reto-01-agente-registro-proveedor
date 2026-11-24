@@ -98,6 +98,8 @@ export type EstadoSoporte = "presente" | "ausente" | "vencido"
 
 export interface ItemChecklist {
   readonly tipo: string
+  /** El mismo soporte en el lenguaje del correo del cliente. Ver domain/etiquetas.ts. */
+  readonly nombre: string
   readonly estado: EstadoSoporte
   readonly archivo: string | null
   readonly vigenciaHasta: string | null

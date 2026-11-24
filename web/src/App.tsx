@@ -10,9 +10,9 @@ import {
 } from "./api.ts"
 import { BloqueConfirmacion } from "./componentes/BloqueConfirmacion.tsx"
 import { EstadoVacio } from "./componentes/EstadoVacio.tsx"
-import { Pensando } from "./componentes/Marcas.tsx"
-import { RailEstado } from "./componentes/RailEstado.tsx"
-import { TarjetaHerramienta } from "./componentes/TarjetaHerramienta.tsx"
+import { Expediente } from "./componentes/Expediente.tsx"
+import { type Correo, HojaCorreo } from "./componentes/HojaCorreo.tsx"
+import { LibroPasos } from "./componentes/LibroPasos.tsx"
 
 interface Turno {
   id: string
@@ -30,14 +30,14 @@ function Texto({ children }: { children: string }) {
         const clave = `${i}-${trozo.slice(0, 8)}`
         if (trozo.startsWith("**") && trozo.endsWith("**")) {
           return (
-            <strong key={clave} className="font-medium">
+            <strong key={clave} className="font-semibold">
               {trozo.slice(2, -2)}
             </strong>
           )
         }
         if (trozo.startsWith("`") && trozo.endsWith("`")) {
           return (
-            <span key={clave} className="dato rounded bg-hueco px-1 py-px text-[0.88em]">
+            <span key={clave} className="dato rounded-sm bg-hueco px-1 py-px text-[0.88em]">
               {trozo.slice(1, -1)}
             </span>
           )
@@ -46,6 +46,19 @@ function Texto({ children }: { children: string }) {
       })}
     </>
   )
+}
+
+/** El correo del cliente, extraído del resultado de la herramienta que lo leyó. */
+function correoDe(llamadas: RegistroLlamada[]): { correo: Correo; cliente: string } | null {
+  for (let i = llamadas.length - 1; i >= 0; i--) {
+    const l = llamadas[i]
+    if (l?.nombre !== "proveedor_leer_solicitud" || !l.ok) continue
+    if (typeof l.resultado !== "object" || l.resultado === null) continue
+    const d = l.resultado as { correo?: Correo; cliente?: string }
+    if (d.correo === undefined || typeof d.cliente !== "string") continue
+    return { correo: d.correo, cliente: d.cliente }
+  }
+  return null
 }
 
 export function App() {
@@ -72,11 +85,10 @@ export function App() {
       .catch(() => setCasos([]))
   }, [])
 
-  useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [])
-
   const todasLasLlamadas = turnos.flatMap((t) => t.llamadas)
+  const llamadasDelTurnoActual = turnos[turnos.length - 1]?.llamadas ?? []
+  const sobre = correoDe(todasLasLlamadas)
+  const clienteActual = sobre?.cliente ?? casos.find((c) => c.caso === casoActual)?.cliente ?? null
 
   const enviar = useCallback(
     async (texto: string, confirmacion = false) => {
@@ -117,8 +129,11 @@ export function App() {
             .catch(() => setArtefactos([]))
         }
       } catch (causa) {
-        // CA5 — el error se muestra en el chat y la sesión sigue viva.
-        const mensaje = causa instanceof Error ? causa.message : "no se pudo contactar al servidor"
+        // CA5 — el error se muestra en el hilo y la sesión sigue viva.
+        const mensaje =
+          causa instanceof Error
+            ? causa.message
+            : "No se pudo contactar al servidor. Vuelve a intentarlo."
         setTurnos((previos) => [
           ...previos,
           { id: crypto.randomUUID(), rol: "sistema", texto: mensaje, llamadas: [] },
@@ -138,9 +153,9 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b border-regla bg-superficie px-4 py-2.5 sm:px-6">
+      <header className="flex shrink-0 items-center gap-3 border-b border-regla bg-hueco px-4 py-2.5 sm:px-6">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[14px] font-medium tracking-tight">
+          <h1 className="truncate text-[14.5px] font-semibold tracking-tight">
             Registro como proveedor
           </h1>
           <p className="truncate text-[12px] text-tenue">
@@ -148,72 +163,77 @@ export function App() {
           </p>
         </div>
         {salud !== null && (
-          <div className="hidden shrink-0 text-right sm:block">
-            <p className="dato text-[11px] text-tenue">
-              {salud.provider} · {salud.model}
-            </p>
-            <p className="dato text-[11px] text-apagado">
-              vigencias al {salud.fechaReferencia}
-              {!salud.claveConfigurada && " · sin clave"}
-            </p>
-          </div>
+          <p className="hidden shrink-0 text-right text-[11.5px] text-tenue sm:block">
+            Vigencias calculadas al {salud.fechaReferencia}
+          </p>
         )}
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <div className="mx-auto max-w-2xl space-y-4">
+            <div className="mx-auto flex max-w-2xl flex-col gap-4">
               {vacio && !pensando && (
                 <EstadoVacio
                   casos={casos}
                   deshabilitado={pensando}
-                  onElegir={(caso) =>
+                  onElegir={(caso) => {
+                    const elegido = casos.find((c) => c.caso === caso)
+                    setCasoActual(caso)
                     enviar(
-                      `Procesa el caso "${caso}". Dime qué campos quedaron llenos, cuáles faltan, si el paquete está listo para firma y qué soportes debo actualizar. No envíes nada todavía.`,
+                      `Revisa la solicitud de ${elegido?.cliente ?? caso}. Dime qué quedó listo, qué falta y si ya se puede firmar. No mandes nada todavía.`,
                     )
-                  }
+                  }}
                 />
               )}
 
-              {turnos.map((turno) => (
-                <article key={turno.id} className="space-y-2">
-                  {turno.rol === "usuario" ? (
-                    <div className="flex justify-end">
-                      <p className="max-w-[80%] rounded-xl rounded-br-sm border border-regla bg-superficie px-3.5 py-2 text-[14px]">
-                        {turno.texto}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      {turno.llamadas.length > 0 && (
-                        <div className="space-y-1.5">
-                          {turno.llamadas.map((llamada) => (
-                            <TarjetaHerramienta key={llamada.id} llamada={llamada} />
-                          ))}
-                        </div>
-                      )}
-                      {turno.texto !== "" && (
-                        <div
-                          className={`whitespace-pre-wrap text-[14px] leading-relaxed ${
-                            turno.rol === "sistema" ? "text-bloqueo" : "text-tinta"
-                          }`}
-                        >
-                          <Texto>{turno.texto}</Texto>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </article>
-              ))}
+              {sobre !== null && <HojaCorreo correo={sobre.correo} cliente={sobre.cliente} />}
+
+              {turnos.map((turno, indice) => {
+                const esUltimo = indice === turnos.length - 1
+                return (
+                  <article key={turno.id} className="flex flex-col gap-3">
+                    {turno.rol === "usuario" ? (
+                      <div className="flex justify-end">
+                        <p className="max-w-[80%] rounded-md rounded-br-sm border border-regla bg-superficie px-3.5 py-2 text-[14px]">
+                          {turno.texto}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {turno.llamadas.length > 0 && (
+                          <LibroPasos
+                            llamadas={turno.llamadas}
+                            pensando={false}
+                            iteracion={esUltimo ? ultimaIteracion : null}
+                          />
+                        )}
+                        {turno.texto !== "" && (
+                          <div
+                            className={`max-w-[64ch] whitespace-pre-wrap text-[14.5px] leading-relaxed ${
+                              turno.rol === "sistema" ? "text-bloqueo" : "text-tinta"
+                            }`}
+                          >
+                            <Texto>{turno.texto}</Texto>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </article>
+                )
+              })}
 
               {pensando && (
-                <Pensando iteracion={ultimaIteracion} tope={salud?.maxIteracionesTurno ?? 25} />
+                <LibroPasos
+                  llamadas={llamadasDelTurnoActual}
+                  pensando
+                  iteracion={ultimaIteracion}
+                />
               )}
 
               {necesitaConfirmacion && !pensando && (
                 <BloqueConfirmacion
-                  caso={casoActual}
+                  cliente={clienteActual}
                   deshabilitado={pensando}
                   onResponder={enviar}
                 />
@@ -228,7 +248,7 @@ export function App() {
               evento.preventDefault()
               enviar(borrador)
             }}
-            className="shrink-0 border-t border-regla bg-superficie px-4 py-3 sm:px-6"
+            className="shrink-0 border-t border-regla bg-hueco px-4 py-3 sm:px-6"
           >
             <div className="mx-auto flex max-w-2xl items-end gap-2">
               <textarea
@@ -245,18 +265,18 @@ export function App() {
                 disabled={pensando}
                 placeholder={
                   necesitaConfirmacion
-                    ? "El agente espera tu decisión"
-                    : 'Procesa el caso "ec-corp-andina"'
+                    ? "Responde, o usa los botones de arriba"
+                    : "Escríbele al agente"
                 }
                 aria-label="Mensaje para el agente"
-                className={`max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-lg border bg-superficie px-3 py-2 text-[14px] placeholder:text-apagado disabled:opacity-60 ${
+                className={`max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-sm border bg-superficie px-3 py-2 text-[14px] placeholder:text-apagado disabled:opacity-60 ${
                   necesitaConfirmacion ? "border-dashed border-acento-regla" : "border-regla"
                 }`}
               />
               <button
                 type="submit"
                 disabled={pensando || borrador.trim() === ""}
-                className="h-10 shrink-0 rounded-lg border border-regla-fuerte px-3.5 text-[13px] transition-colors hover:bg-hueco disabled:opacity-40"
+                className="h-10 shrink-0 rounded-sm border border-regla-fuerte px-4 text-[13.5px] transition-colors hover:bg-superficie disabled:opacity-40"
               >
                 Enviar
               </button>
@@ -264,8 +284,13 @@ export function App() {
           </form>
         </main>
 
-        <div className="hidden min-h-0 lg:block">
-          <RailEstado caso={casoActual} llamadas={todasLasLlamadas} artefactos={artefactos} />
+        <div className="hidden min-h-0 border-l border-regla lg:block">
+          <Expediente
+            cliente={clienteActual}
+            caso={casoActual}
+            llamadas={todasLasLlamadas}
+            artefactos={artefactos}
+          />
         </div>
       </div>
     </div>

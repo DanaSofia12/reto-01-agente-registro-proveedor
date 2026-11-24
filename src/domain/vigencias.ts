@@ -1,3 +1,4 @@
+import { nombreSoporte } from "./etiquetas.ts"
 import type { Checklist, ItemChecklist, SoporteIndexado } from "./tipos.ts"
 
 /**
@@ -28,6 +29,7 @@ export function evaluarSoporte(
   if (soporte === undefined) {
     return {
       tipo,
+      nombre: nombreSoporte(tipo),
       estado: "ausente",
       archivo: null,
       vigenciaHasta: null,
@@ -40,6 +42,7 @@ export function evaluarSoporte(
   if (soporte.vigenciaHasta === null) {
     return {
       tipo,
+      nombre: nombreSoporte(tipo),
       estado: "presente",
       archivo: soporte.archivo,
       vigenciaHasta: null,
@@ -52,6 +55,7 @@ export function evaluarSoporte(
   const vencido = dias < 0
   return {
     tipo,
+    nombre: nombreSoporte(tipo),
     estado: vencido ? "vencido" : "presente",
     archivo: soporte.archivo,
     vigenciaHasta: soporte.vigenciaHasta,

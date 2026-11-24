@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { nombrePais, nombreSoporte } from "../domain/etiquetas.ts"
 import { mapearCampos } from "../domain/mapeo.ts"
 import type { Checklist, ContextoHerramienta, Mapeo, Solicitud } from "../domain/tipos.ts"
 import { campos as camposOrdenados } from "../domain/tipos.ts"
@@ -158,14 +159,27 @@ export const leer_solicitud = {
         salida: ok({
           caso: args.caso,
           pais: solicitud.pais,
+          paisNombre: nombrePais(solicitud.pais),
           cliente: solicitud.cliente,
           formato: solicitud.formato,
+          // El correo entero, no un resumen: es lo que el cliente realmente
+          // pidió, y la analista necesita poder leerlo sin salir de la pantalla.
+          correo: {
+            de: solicitud.de,
+            para: solicitud.para,
+            asunto: solicitud.asunto,
+            fecha: solicitud.fecha,
+            cuerpo: solicitud.cuerpo,
+            adjuntos: solicitud.adjuntos,
+          },
           asunto: solicitud.asunto,
           campos: campos.map((c) => ({
             etiqueta: c.etiqueta,
             obligatorio: c.obligatorio ?? false,
           })),
-          soportes,
+          // Con nombre, para que el agente no tenga que inventar cómo se llama
+          // un soporte que el repositorio no tiene.
+          soportes: soportes.map((tipo) => ({ tipo, nombre: nombreSoporte(tipo) })),
         }),
       }
     })(ctx),

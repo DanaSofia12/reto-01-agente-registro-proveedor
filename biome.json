@@ -9,7 +9,8 @@
       "!node_modules",
       "!modulo",
       "!**/*.css",
-      "!**/*.md"
+      "!**/*.md",
+      "!docs"
     ]
   },
   "formatter": {

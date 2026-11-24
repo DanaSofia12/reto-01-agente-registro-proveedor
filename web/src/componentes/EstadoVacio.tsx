@@ -1,6 +1,13 @@
 import type { ResumenCaso } from "../api.ts"
+import { nombrePais } from "../lenguaje.ts"
 
-/** Resuelve "¿y ahora qué escribo?": los casos que hay, listos para arrancar. */
+/**
+ * La bandeja. Resuelve «¿y ahora qué escribo?» sin pedirle que escriba nada.
+ *
+ * Cada solicitud se presenta por el nombre del cliente y el asunto real del
+ * correo, que es como ella las reconoce. El identificador interno del caso no
+ * aparece: le serviría a un programador, no a quien hace este trabajo.
+ */
 export function EstadoVacio({
   casos,
   onElegir,
@@ -11,25 +18,29 @@ export function EstadoVacio({
   deshabilitado: boolean
 }) {
   return (
-    <div className="mx-auto max-w-xl px-2 py-10 text-center">
-      <h2 className="text-[19px] font-medium tracking-tight">Solicitudes en la bandeja</h2>
-      <p className="mx-auto mt-1.5 max-w-sm text-[14px] leading-snug text-tenue">
-        Elige una y el agente leerá el correo, llenará el formulario desde el repositorio maestro y
-        armará el paquete. La firma y el envío siguen siendo tuyos.
+    <div className="mx-auto max-w-2xl px-2 py-10">
+      <h2 className="text-[20px] font-semibold tracking-tight">Solicitudes por responder</h2>
+      <p className="mt-1.5 max-w-prose text-[14px] leading-snug text-tenue">
+        Elige una. El agente lee el correo del cliente, llena el formulario con los datos que
+        Periferia ya tiene registrados y revisa qué soportes siguen vigentes. La firma y el envío
+        siguen siendo tuyos.
       </p>
 
-      <ul className="mt-7 grid gap-2 text-left sm:grid-cols-2">
+      <ul className="mt-7 grid gap-2.5">
         {casos.map((c) => (
           <li key={c.caso}>
             <button
               type="button"
               disabled={deshabilitado}
               onClick={() => onElegir(c.caso)}
-              className="group w-full rounded-lg border border-regla bg-superficie px-3.5 py-3 text-left transition-colors hover:border-regla-fuerte hover:bg-hueco disabled:opacity-50"
+              className="w-full rounded-sm border border-regla bg-superficie px-4 py-3 text-left transition-colors hover:border-acento-regla hover:bg-acento-suave disabled:opacity-50"
             >
-              <span className="block truncate text-[14px] text-tinta">{c.cliente}</span>
-              <span className="dato mt-1 block text-[11px] text-apagado">
-                {c.caso} · {c.pais} · {c.formato}
+              <span className="block truncate text-[14.5px] font-medium">{c.cliente}</span>
+              <span className="mt-0.5 block truncate font-serif text-[13.5px] text-tenue">
+                {c.asunto}
+              </span>
+              <span className="mt-1.5 block text-[11.5px] text-apagado">
+                {nombrePais(c.pais)} · formulario {c.formato.toUpperCase()}
               </span>
             </button>
           </li>
@@ -38,7 +49,7 @@ export function EstadoVacio({
 
       {casos.length === 0 && (
         <p className="mt-6 text-[13px] text-apagado">
-          No hay casos en <span className="dato">fixtures/reto-01/casos/</span>.
+          No hay solicitudes en la bandeja en este momento.
         </p>
       )}
     </div>
