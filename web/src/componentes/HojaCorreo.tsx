@@ -1,14 +1,16 @@
 import { useState } from "react"
 import { fechaLarga } from "../lenguaje.ts"
+import { Avatar, type EstadoSolicitud } from "./Avatar.tsx"
 
 /**
  * El correo que mandó el cliente, tal como llegó.
  *
- * Antes el agente lo leía y la analista nunca lo veía: tenía que creerle
- * cuando decía «el cliente exige tal certificado». Ahora la frase está ahí,
- * escrita por el cliente, a un centímetro de la afirmación del agente.
+ * Antes el agente lo leía y la analista nunca lo veía: tenía que creerle cuando
+ * decía «el cliente exige tal certificado». Ahora la frase está ahí, escrita por
+ * el cliente, a un centímetro de la afirmación.
  *
- * Se pliega después de leerlo porque en el segundo turno ya estorba.
+ * Se renderiza como correspondencia —con remitente y una regla al costado— y no
+ * como una tarjeta, porque eso es lo que es.
  */
 
 export interface Correo {
@@ -20,67 +22,58 @@ export interface Correo {
   adjuntos: string[]
 }
 
-export function HojaCorreo({ correo, cliente }: { correo: Correo; cliente: string }) {
+export function HojaCorreo({
+  correo,
+  cliente,
+  estado,
+}: {
+  correo: Correo
+  cliente: string
+  estado: EstadoSolicitud
+}) {
   const [abierto, setAbierto] = useState(true)
+  const parrafos = correo.cuerpo.split("\n").filter((p) => p.trim() !== "")
 
   return (
-    <article className="overflow-hidden rounded-sm border border-regla border-t-[3px] border-t-acento bg-superficie">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        aria-expanded={abierto}
-        className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left hover:bg-hueco"
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-serif text-[16px] font-semibold leading-snug">
-            {correo.asunto}
-          </span>
-          <span className="dato mt-0.5 block truncate text-[11.5px] text-apagado">{correo.de}</span>
-        </span>
-        <span className="shrink-0 text-[12px] text-tenue">
-          {abierto ? "Ocultar" : "Ver correo"}
-        </span>
-      </button>
+    <article className="grid grid-cols-[34px_minmax(0,1fr)] gap-x-3.5">
+      <Avatar cliente={cliente} estado={estado} />
+      <div className="-ml-[3px] min-w-0 border-l-2 border-pelo pl-4">
+        <p className="m-0 mb-1 flex items-baseline gap-3 text-[12.5px] text-tenue">
+          <span className="min-w-0 truncate">{cliente}</span>
+          <span className="ml-auto shrink-0">{fechaLarga(correo.fecha, false)}</span>
+        </p>
+        <h2 className="titular m-0 mb-2 text-[19px]">{correo.asunto}</h2>
 
-      {abierto && (
-        <>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-0.5 border-t border-dashed border-regla px-4 pb-2.5 pt-3 text-[12.5px]">
-            <dt className="text-apagado">De</dt>
-            <dd className="dato m-0 break-words text-[12px]">{correo.de}</dd>
-            <dt className="text-apagado">Para</dt>
-            <dd className="dato m-0 break-words text-[12px]">{correo.para}</dd>
-            <dt className="text-apagado">Recibido</dt>
-            <dd className="m-0 text-[12.5px]">{fechaLarga(correo.fecha)}</dd>
-            <dt className="text-apagado">Cliente</dt>
-            <dd className="m-0 text-[12.5px]">{cliente}</dd>
-          </dl>
-
-          <div className="carta max-w-[62ch] px-4 pb-3 text-[#36332c]">
-            {correo.cuerpo.split("\n").map((parrafo, i) =>
-              parrafo.trim() === "" ? null : (
-                // biome-ignore lint/suspicious/noArrayIndexKey: el cuerpo es texto plano inmutable
-                <p key={i} className="mb-2 last:mb-0">
+        {abierto && (
+          <>
+            <div className="max-w-[54ch] text-[14.5px] leading-[1.68] text-prosa">
+              {parrafos.map((parrafo) => (
+                <p key={parrafo.slice(0, 32)} className="mb-2.5 last:mb-0">
                   {parrafo}
                 </p>
-              ),
-            )}
-          </div>
-
-          {correo.adjuntos.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pb-3.5">
-              {correo.adjuntos.map((a) => (
-                <span
-                  key={a}
-                  className="dato inline-flex items-center gap-2 rounded-sm border border-acento-regla bg-acento-suave px-2.5 py-1 text-[11.5px] text-acento"
-                >
-                  <Clip />
-                  {a}
-                </span>
               ))}
             </div>
-          )}
-        </>
-      )}
+            {correo.adjuntos.map((adjunto) => (
+              <span
+                key={adjunto}
+                className="dato mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] ring-1 ring-pelo ring-inset"
+              >
+                <Clip />
+                {adjunto}
+              </span>
+            ))}
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+          className="mt-2.5 block text-[12.5px] text-prosa hover:underline"
+        >
+          {abierto ? "Ocultar el correo" : "Ver el correo completo"}
+        </button>
+      </div>
     </article>
   )
 }

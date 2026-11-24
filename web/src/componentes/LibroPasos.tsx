@@ -1,98 +1,80 @@
 import type { RegistroLlamada } from "../api.ts"
-import { accion, accionEnCurso } from "../lenguaje.ts"
+import { accion, lista, nombrePais } from "../lenguaje.ts"
 
 /**
  * Lo que hizo el agente, paso a paso.
  *
- * Cada llamada a herramienta tiene que ser visible, pero mostrar el nombre de
- * la función y su JSON es visible para un programador y opaco para quien hace
- * este trabajo. Aquí cada paso es una frase en su idioma.
+ * Cada llamada a herramienta tiene que ser visible, pero mostrar el nombre de la
+ * función y su JSON es visible para un programador y opaco para quien hace este
+ * trabajo. Aquí cada paso es una frase.
  *
- * Se numera porque es una secuencia real: cada línea es una iteración del
- * bucle del agente, no un indicador de progreso decorativo.
+ * Se numera porque es una secuencia real: cada línea es una iteración del bucle
+ * del agente, no un indicador de progreso decorativo.
  */
 
-function lista(datos: Record<string, unknown>, clave: string): unknown[] {
-  const valor = datos[clave]
-  return Array.isArray(valor) ? valor : []
-}
-
-/** El resultado de cada herramienta, resumido sin jerga. */
+/** El resultado de cada herramienta, contado como se lo contarías a una persona. */
 function resultadoLegible(llamada: RegistroLlamada): string {
   if (!llamada.ok) return llamada.resumen
-  const d = llamada.resultado
-  if (typeof d !== "object" || d === null) return "listo"
-  const datos = d as Record<string, unknown>
+  const datos =
+    typeof llamada.resultado === "object" && llamada.resultado !== null
+      ? (llamada.resultado as Record<string, unknown>)
+      : null
+  if (datos === null) return "Listo"
 
   switch (llamada.nombre) {
     case "proveedor_leer_solicitud": {
-      const pais = typeof datos.paisNombre === "string" ? datos.paisNombre : ""
+      const pais = typeof datos.pais === "string" ? nombrePais(datos.pais) : "el cliente"
       const formato = typeof datos.formato === "string" ? datos.formato.toUpperCase() : ""
       const campos = lista(datos, "campos").length
       const soportes = lista(datos, "soportes").length
-      return `${pais} · formulario ${formato} · ${campos} campos · ${soportes} soportes exigidos`
+      return `Desde ${pais}: pide un formulario ${formato} con ${campos} campos y ${soportes} soportes`
     }
     case "proveedor_mapear_campos": {
       const llenos = lista(datos, "llenos").length
       const confirmar = lista(datos, "requiere_confirmacion").length
       const faltan = lista(datos, "faltantes").length
-      const partes = [`${llenos} campos llenos`]
-      if (confirmar > 0) partes.push(`${confirmar} por confirmar`)
-      if (faltan > 0) partes.push(`${faltan} sin dato`)
-      return partes.join(" · ")
+      const colas: string[] = []
+      if (confirmar > 0) colas.push(`${confirmar} necesita tu visto bueno`)
+      if (faltan > 0) colas.push(`${faltan} quedó sin dato`)
+      const cola = colas.length === 0 ? "" : `; ${colas.join(" y ")}`
+      return `Llenó ${llenos} campos${cola}`
     }
     case "proveedor_generar_formulario":
-      return "Formulario diligenciado y guardado"
+      return "Quedó guardado y listo para adjuntar"
     case "proveedor_armar_paquete": {
-      const items = lista(datos, "checklist") as { bloquea?: boolean }[]
-      const bloqueos = items.filter((i) => i.bloquea === true).length
+      const bloqueos = lista<{ bloquea?: boolean }>(datos, "checklist").filter(
+        (i) => i.bloquea === true,
+      ).length
       if (datos.listo_para_firma === true) return "Paquete completo, listo para firma"
       return bloqueos === 1
-        ? "Paquete armado · falta 1 soporte para poder firmar"
-        : `Paquete armado · faltan ${bloqueos} soportes para poder firmar`
+        ? "Falta un soporte para que el representante legal pueda firmar"
+        : `Faltan ${bloqueos} soportes para poder firmar`
     }
     case "proveedor_simular_envio":
       return "Constancia registrada. No salió nada hacia el cliente."
     default:
-      return "listo"
+      return "Listo"
   }
 }
 
 export function LibroPasos({
   llamadas,
   pensando,
-  iteracion,
 }: {
-  llamadas: RegistroLlamada[]
+  llamadas: readonly RegistroLlamada[]
   pensando: boolean
-  iteracion: number | null
 }) {
   if (llamadas.length === 0 && !pensando) return null
+  const ultima = llamadas[llamadas.length - 1]
 
   return (
-    <section
-      aria-label="Lo que hizo el agente"
-      className="overflow-hidden rounded-sm border border-regla bg-superficie"
-    >
-      <div className="flex items-center gap-2.5 border-b border-regla px-3.5 py-2">
-        <h3 className="text-[13px] font-semibold">Lo que hizo el agente</h3>
-        {pensando ? (
-          <span className="dato ml-auto rounded-full border border-acento-regla bg-acento-suave px-2.5 py-px text-[11px] text-acento">
-            {iteracion === null ? "trabajando" : `paso ${iteracion}`}
-          </span>
-        ) : (
-          <span className="ml-auto text-[11.5px] text-apagado">
-            {llamadas.length === 1 ? "1 paso" : `${llamadas.length} pasos`}
-          </span>
-        )}
-      </div>
-
-      <ol className="py-1">
+    <section aria-label="Lo que hizo el agente">
+      <ol className="relative m-0 list-none p-0 before:absolute before:bottom-3 before:left-3 before:top-3 before:w-0.5 before:bg-pelo before:content-['']">
         {llamadas.map((llamada, i) => (
           <Paso
             key={llamada.id}
             numero={i + 1}
-            texto={accion(llamada.nombre)}
+            titulo={accion(llamada.nombre)}
             detalle={resultadoLegible(llamada)}
             ok={llamada.ok}
           />
@@ -100,11 +82,7 @@ export function LibroPasos({
         {pensando && (
           <Paso
             numero={llamadas.length + 1}
-            texto={
-              llamadas.length === 0
-                ? "Revisando qué hace falta"
-                : accionEnCurso(llamadas[llamadas.length - 1]?.nombre ?? "")
-            }
+            titulo={ultima === undefined ? "Revisando qué hace falta" : accion(ultima.nombre, true)}
             detalle={null}
             ok
             corriendo
@@ -117,39 +95,37 @@ export function LibroPasos({
 
 function Paso({
   numero,
-  texto,
+  titulo,
   detalle,
   ok,
   corriendo = false,
 }: {
   numero: number
-  texto: string
+  titulo: string
   detalle: string | null
   ok: boolean
   corriendo?: boolean
 }) {
   const ficha = corriendo
-    ? "corriendo border-acento bg-acento text-white"
+    ? "latiendo bg-lima text-carbon"
     : ok
-      ? "border-acento-regla bg-acento-suave text-acento"
-      : "border-bloqueo-regla bg-bloqueo-suave text-bloqueo"
+      ? "bg-carbon text-lima"
+      : "bg-brasa-velo text-brasa"
 
   return (
-    <li className="relative grid grid-cols-[21px_minmax(0,1fr)] items-start gap-x-3 px-3.5 py-2">
+    <li className="relative grid grid-cols-[26px_minmax(0,1fr)] items-start gap-x-3.5 pb-4 last:pb-0">
       <span
-        aria-hidden="true"
-        className="absolute left-[23px] top-0 h-2 w-px bg-regla first:hidden"
-      />
-      <span
-        className={`dato mt-px grid h-[21px] w-[21px] place-items-center rounded-full border text-[11px] ${ficha}`}
+        className={`dato z-[1] grid h-[26px] w-[26px] place-items-center rounded-[9px] text-[10.5px] shadow-[0_0_0_5px_var(--color-nube)] ${ficha}`}
       >
         {numero}
       </span>
       <span className="min-w-0">
-        <span className="block text-[14px] leading-snug">{texto}</span>
+        <span className="block text-[14.5px] font-medium leading-snug tracking-[-0.012em]">
+          {titulo}
+        </span>
         {detalle !== null && (
           <span
-            className={`mt-0.5 block text-[12.5px] leading-snug ${ok ? "text-tenue" : "text-bloqueo"}`}
+            className={`mt-0.5 block text-[13px] leading-snug ${ok ? "text-prosa" : "text-brasa"}`}
           >
             {detalle}
           </span>

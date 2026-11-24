@@ -1,205 +1,179 @@
 import type { RegistroLlamada } from "../api.ts"
 import { urlArchivo } from "../api.ts"
-import { cuñoDeSoporte, nombreArtefacto } from "../lenguaje.ts"
+import {
+  type ItemSoporte,
+  lista,
+  nombreArtefacto,
+  nombrePais,
+  ultimoResultado,
+  vigenciaDe,
+} from "../lenguaje.ts"
+import { Avatar, type EstadoSolicitud } from "./Avatar.tsx"
 
 /**
- * El expediente del caso: la evidencia de lo que el agente afirma.
+ * El expediente: la evidencia de lo que el agente afirma en el hilo.
  *
- * Regla del diseño — si el agente dice en el chat que falta un soporte, ese
- * soporte está marcado aquí. Nunca una afirmación sin su respaldo al lado.
- * Permanece visible mientras ella sigue escribiendo.
+ * Si el texto dice que falta un soporte, ese soporte está marcado aquí. Nunca
+ * una afirmación sin su respaldo al lado.
  */
 
-interface ItemChecklist {
-  tipo: string
-  nombre?: string
-  estado: string
-  vigencia_hasta: string | null
-  dias_restantes: number | null
-  bloquea: boolean
+interface CampoPendiente {
+  readonly etiqueta: string
+  readonly nota?: string
+  readonly motivo?: string
 }
 
-interface CampoMapeado {
-  etiqueta: string
-  nota?: string
-  motivo?: string
-}
-
-function ultimoResultado(
-  llamadas: RegistroLlamada[],
-  nombre: string,
-): Record<string, unknown> | null {
-  for (let i = llamadas.length - 1; i >= 0; i--) {
-    const l = llamadas[i]
-    if (l?.nombre === nombre && l.ok && typeof l.resultado === "object" && l.resultado !== null) {
-      return l.resultado as Record<string, unknown>
-    }
-  }
-  return null
-}
-
-function lista<T>(datos: Record<string, unknown> | null, clave: string): T[] {
-  if (datos === null) return []
-  const valor = datos[clave]
-  return Array.isArray(valor) ? (valor as T[]) : []
+const TINTE: Readonly<Record<string, string>> = {
+  vigente: "bg-savia",
+  por_vencer: "bg-lima",
+  bloquea: "bg-brasa",
 }
 
 export function Expediente({
   cliente,
+  estado,
   caso,
   llamadas,
   artefactos,
 }: {
   cliente: string | null
+  estado: EstadoSolicitud
   caso: string | null
-  llamadas: RegistroLlamada[]
-  artefactos: string[]
+  llamadas: readonly RegistroLlamada[]
+  artefactos: readonly string[]
 }) {
   const solicitud = ultimoResultado(llamadas, "proveedor_leer_solicitud")
   const mapeo = ultimoResultado(llamadas, "proveedor_mapear_campos")
   const paquete = ultimoResultado(llamadas, "proveedor_armar_paquete")
 
-  const llenos = lista<CampoMapeado>(mapeo, "llenos").length
-  const confirmar = lista<CampoMapeado>(mapeo, "requiere_confirmacion")
-  const faltantes = lista<CampoMapeado>(mapeo, "faltantes")
-  const total = llenos + confirmar.length + faltantes.length
+  const llenos = lista(mapeo, "llenos").length
+  const porConfirmar = lista<CampoPendiente>(mapeo, "requiere_confirmacion")
+  const faltantes = lista<CampoPendiente>(mapeo, "faltantes")
+  const total = llenos + porConfirmar.length + faltantes.length
 
-  const items = lista<ItemChecklist>(paquete, "checklist")
-  const listo = paquete === null ? null : paquete.listo_para_firma === true
-
-  const vacio = solicitud === null && mapeo === null && paquete === null && artefactos.length === 0
+  const soportes = lista<ItemSoporte>(paquete, "checklist")
+  const bloqueos = soportes.filter((i) => i.bloquea)
+  const listoParaFirma = paquete === null ? null : paquete.listo_para_firma === true
 
   return (
     <aside
       aria-label="Expediente del caso"
-      className="flex h-full flex-col gap-4 overflow-y-auto bg-hueco px-4 py-5"
+      className="z-[2] flex h-full flex-col gap-5 overflow-y-auto bg-papel px-4 py-5 shadow-[-1px_0_0_var(--color-pelo),-6px_0_14px_-10px_rgba(22,24,26,0.16)]"
     >
-      {vacio ? (
-        <p className="text-[13px] leading-snug text-apagado">
-          Aquí aparece el detalle de lo que el agente revise: los campos del formulario, el estado
-          de cada soporte y los archivos que deje listos.
-        </p>
-      ) : null}
-
-      {cliente !== null && (
-        <div className="rounded-sm border border-regla bg-superficie px-3.5 py-3">
-          <h3 className="text-[14.5px] font-semibold leading-tight">{cliente}</h3>
-          {solicitud !== null && (
-            <p className="mt-1 text-[12px] text-tenue">
-              {typeof solicitud.paisNombre === "string" ? solicitud.paisNombre : ""}
-              {typeof solicitud.formato === "string" &&
-                ` · formulario ${solicitud.formato.toUpperCase()}`}
-            </p>
-          )}
+      {cliente === null ? (
+        <>
+          <Rotulo>Expediente</Rotulo>
+          <p className="m-0 text-[13px] leading-relaxed text-tenue">
+            Cuando el agente revise una solicitud, aquí queda el detalle: los campos del formulario,
+            el estado de cada soporte y los documentos que deje listos.
+          </p>
+        </>
+      ) : (
+        <div className="flex items-center gap-3">
+          <Avatar cliente={cliente} estado={estado} grande />
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold leading-tight tracking-[-0.022em]">
+              {cliente}
+            </span>
+            {typeof solicitud?.pais === "string" && (
+              <span className="block text-[12px] text-tenue">{nombrePais(solicitud.pais)}</span>
+            )}
+          </span>
         </div>
       )}
 
-      {listo !== null && (
+      {listoParaFirma !== null && (
         <div
-          className={`rounded-sm border px-3.5 py-3 ${
-            listo
-              ? "border-vigente-regla bg-vigente-suave"
-              : "border-bloqueo-regla bg-bloqueo-suave"
-          }`}
+          className={`rounded-2xl px-4 py-3.5 ${listoParaFirma ? "bg-savia-velo" : "bg-brasa-velo"}`}
         >
           <p
-            className={`text-[13.5px] font-semibold leading-snug ${listo ? "text-vigente" : "text-bloqueo"}`}
+            className={`m-0 text-[14.5px] font-semibold leading-tight tracking-[-0.022em] ${
+              listoParaFirma ? "text-savia" : "text-brasa"
+            }`}
           >
-            {listo ? "Listo para que firme el representante legal" : "No puede firmarse todavía"}
+            {listoParaFirma
+              ? "Listo para que firme el representante legal"
+              : "No puede firmarse todavía"}
           </p>
-          {!listo && (
-            <ul className="mt-1.5 space-y-0.5">
-              {items
-                .filter((i) => i.bloquea)
-                .map((i) => (
-                  <li key={i.tipo} className="text-[12.5px] leading-snug text-bloqueo">
-                    Falta {(i.nombre ?? i.tipo).toLowerCase()}
-                  </li>
-                ))}
+          {bloqueos.length > 0 && (
+            <ul className="m-0 mt-2 list-disc pl-4">
+              {bloqueos.map((i) => (
+                <li key={i.tipo} className="text-[13px] leading-snug text-prosa">
+                  Falta {(i.nombre ?? i.tipo).toLowerCase()}
+                </li>
+              ))}
             </ul>
           )}
         </div>
       )}
 
       {total > 0 && (
-        <Bloque titulo="Campos del formulario" cuenta={`${llenos} de ${total}`}>
-          <div className="mx-3.5 mt-2.5 flex h-[5px] overflow-hidden rounded-full bg-regla">
-            <i style={{ width: `${(llenos / total) * 100}%` }} className="block bg-vigente" />
-            <i
-              style={{ width: `${(confirmar.length / total) * 100}%` }}
-              className="block bg-atencion"
-            />
-            <i
-              style={{ width: `${(faltantes.length / total) * 100}%` }}
-              className="block bg-bloqueo"
-            />
-          </div>
-          <div className="flex flex-wrap gap-x-3.5 gap-y-1 px-3.5 pb-2.5 pt-2 text-[11.5px] text-tenue">
-            <Leyenda color="bg-vigente" texto={`${llenos} llenos`} />
-            {confirmar.length > 0 && (
-              <Leyenda color="bg-atencion" texto={`${confirmar.length} por confirmar`} />
-            )}
-            {faltantes.length > 0 && (
-              <Leyenda color="bg-bloqueo" texto={`${faltantes.length} sin dato`} />
-            )}
-          </div>
-
-          {[...confirmar, ...faltantes].length > 0 && (
-            <dl className="border-t border-regla px-3.5 py-2.5">
-              {confirmar.map((c) => (
-                <div key={c.etiqueta} className="mb-2 last:mb-0">
-                  <dt className="text-[12.5px] font-medium text-atencion">{c.etiqueta}</dt>
-                  <dd className="m-0 text-[12px] leading-snug text-tenue">{c.nota}</dd>
+        <section>
+          <Rotulo>Campos del formulario</Rotulo>
+          <Anillo llenos={llenos} porConfirmar={porConfirmar.length} faltantes={faltantes.length} />
+          {[...porConfirmar, ...faltantes].length > 0 && (
+            <dl className="m-0 mt-4 flex flex-col gap-3">
+              {porConfirmar.map((c) => (
+                <div key={c.etiqueta}>
+                  <dt className="m-0 text-[13px] font-semibold leading-tight">
+                    {c.etiqueta}
+                    <span className="ml-1.5 rounded-full bg-lima px-2 py-px text-[11px] font-medium text-carbon">
+                      decide tú
+                    </span>
+                  </dt>
+                  <dd className="m-0 mt-0.5 text-[12.5px] leading-snug text-tenue">{c.nota}</dd>
                 </div>
               ))}
               {faltantes.map((c) => (
-                <div key={c.etiqueta} className="mb-2 last:mb-0">
-                  <dt className="text-[12.5px] font-medium">{c.etiqueta}</dt>
-                  <dd className="m-0 text-[12px] leading-snug text-apagado">{c.motivo}</dd>
+                <div key={c.etiqueta}>
+                  <dt className="m-0 text-[13px] font-semibold leading-tight">{c.etiqueta}</dt>
+                  <dd className="m-0 mt-0.5 text-[12.5px] leading-snug text-tenue">{c.motivo}</dd>
                 </div>
               ))}
             </dl>
           )}
-        </Bloque>
+        </section>
       )}
 
-      {items.length > 0 && (
-        <Bloque
-          titulo="Soportes que pide el cliente"
-          cuenta={`${items.filter((i) => !i.bloquea).length} de ${items.length}`}
-        >
-          <ul>
-            {items.map((i) => {
-              const cuño = cuñoDeSoporte(i)
+      {soportes.length > 0 && (
+        <section>
+          <Rotulo>Soportes que pide el cliente</Rotulo>
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {soportes.map((item) => {
+              const v = vigenciaDe(item)
               return (
                 <li
-                  key={i.tipo}
-                  className="flex items-start gap-2.5 px-3.5 py-2 [&+&]:border-t [&+&]:border-hueco"
+                  key={item.tipo}
+                  className="grid grid-cols-[10px_minmax(0,1fr)] items-start gap-2.5"
                 >
-                  <span className="min-w-0 flex-1 text-[13px] leading-snug">
-                    {i.nombre ?? i.tipo}
-                  </span>
-                  <span
-                    className={`dato mt-px shrink-0 rounded-sm border px-1.5 py-px text-[10.5px] ${
-                      cuño.estado === "vigente"
-                        ? "border-vigente-regla bg-vigente-suave text-vigente"
-                        : cuño.estado === "porvencer"
-                          ? "border-atencion-regla bg-atencion-suave text-atencion"
-                          : "border-bloqueo-regla bg-bloqueo-suave text-bloqueo"
-                    }`}
-                  >
-                    {cuño.texto}
+                  <i className={`mt-[5px] h-2.5 w-2.5 shrink-0 rounded-[3px] ${TINTE[v.estado]}`} />
+                  <span>
+                    <span className="block text-[13px] leading-snug">
+                      {item.nombre ?? item.tipo}
+                    </span>
+                    <span
+                      className={`block text-[12px] leading-tight ${
+                        v.estado === "por_vencer"
+                          ? "font-semibold text-lima-hondo"
+                          : v.estado === "bloquea"
+                            ? "font-semibold text-brasa"
+                            : "text-tenue"
+                      }`}
+                    >
+                      {v.texto}
+                    </span>
                   </span>
                 </li>
               )
             })}
           </ul>
-        </Bloque>
+        </section>
       )}
 
       {artefactos.length > 0 && caso !== null && (
-        <Bloque titulo="Documentos listos" cuenta={`${artefactos.length}`}>
-          <ul className="py-1">
+        <section>
+          <Rotulo>Documentos listos</Rotulo>
+          <ul className="m-0 list-none p-0">
             {artefactos.map((a) => (
               <li key={a}>
                 <a
@@ -207,43 +181,84 @@ export function Expediente({
                   target="_blank"
                   rel="noreferrer"
                   title={a}
-                  className="block truncate px-3.5 py-1.5 text-[12.5px] text-acento hover:bg-acento-suave hover:underline"
+                  className="-ml-3 block truncate rounded-[10px] px-3 py-1.5 text-[13px] no-underline hover:bg-lima"
                 >
                   {nombreArtefacto(a)}
                 </a>
               </li>
             ))}
           </ul>
-        </Bloque>
+        </section>
       )}
     </aside>
   )
 }
 
-function Bloque({
-  titulo,
-  cuenta,
-  children,
+function Rotulo({ children }: { children: string }) {
+  return <h3 className="m-0 mb-3 text-[11.5px] font-semibold text-tenue">{children}</h3>
+}
+
+/** El avance de los campos como anillo: una sola forma dice cuánto y de qué tipo. */
+function Anillo({
+  llenos,
+  porConfirmar,
+  faltantes,
 }: {
-  titulo: string
-  cuenta: string
-  children: React.ReactNode
+  llenos: number
+  porConfirmar: number
+  faltantes: number
 }) {
+  const total = llenos + porConfirmar + faltantes
+  const vuelta = 2 * Math.PI * 33
+  const arco = (n: number) => (n / total) * vuelta
+
   return (
-    <section className="overflow-hidden rounded-sm border border-regla bg-superficie">
-      <div className="flex items-baseline gap-2 border-b border-regla px-3.5 py-2">
-        <h3 className="text-[12.5px] font-semibold">{titulo}</h3>
-        <span className="dato ml-auto text-[11.5px] text-tenue">{cuenta}</span>
-      </div>
-      {children}
-    </section>
+    <div className="flex items-center gap-4">
+      <span className="relative h-[78px] w-[78px] shrink-0">
+        <svg viewBox="0 0 78 78" aria-hidden="true" className="h-[78px] w-[78px] -rotate-90">
+          <circle cx="39" cy="39" r="33" className="fill-none stroke-pelo stroke-[9]" />
+          <circle
+            cx="39"
+            cy="39"
+            r="33"
+            className="fill-none stroke-savia stroke-[9]"
+            strokeDasharray={`${arco(llenos)} ${vuelta}`}
+          />
+          <circle
+            cx="39"
+            cy="39"
+            r="33"
+            className="fill-none stroke-lima stroke-[9]"
+            strokeDasharray={`${arco(porConfirmar)} ${vuelta}`}
+            strokeDashoffset={-arco(llenos)}
+          />
+          <circle
+            cx="39"
+            cy="39"
+            r="33"
+            className="fill-none stroke-brasa stroke-[9]"
+            strokeDasharray={`${arco(faltantes)} ${vuelta}`}
+            strokeDashoffset={-arco(llenos + porConfirmar)}
+          />
+        </svg>
+        <span className="absolute inset-0 grid place-items-center text-[17px] font-bold tracking-[-0.03em]">
+          {llenos}
+          <span className="sr-only"> de {total}</span>
+        </span>
+      </span>
+      <span className="flex flex-col gap-1.5 text-[12.5px] text-prosa">
+        <Clave color="bg-savia" texto={`${llenos} llenos`} />
+        {porConfirmar > 0 && <Clave color="bg-lima" texto={`${porConfirmar} por confirmar`} />}
+        {faltantes > 0 && <Clave color="bg-brasa" texto={`${faltantes} sin dato`} />}
+      </span>
+    </div>
   )
 }
 
-function Leyenda({ color, texto }: { color: string; texto: string }) {
+function Clave({ color, texto }: { color: string; texto: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <i className={`h-[7px] w-[7px] shrink-0 rounded-sm ${color}`} />
+    <span className="flex items-center gap-2">
+      <i className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
       {texto}
     </span>
   )

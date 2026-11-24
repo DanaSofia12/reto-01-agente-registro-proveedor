@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   enviarMensaje,
   obtenerArtefactos,
@@ -8,17 +8,22 @@ import {
   type ResumenCaso,
   type Salud,
 } from "./api.ts"
+import { type EstadoSolicitud, Robot } from "./componentes/Avatar.tsx"
+import { Bandeja, type EstadoPorCaso } from "./componentes/Bandeja.tsx"
 import { BloqueConfirmacion } from "./componentes/BloqueConfirmacion.tsx"
 import { EstadoVacio } from "./componentes/EstadoVacio.tsx"
 import { Expediente } from "./componentes/Expediente.tsx"
 import { type Correo, HojaCorreo } from "./componentes/HojaCorreo.tsx"
 import { LibroPasos } from "./componentes/LibroPasos.tsx"
+import { fechaLarga, marcarCaso } from "./lenguaje.ts"
 
 interface Turno {
-  id: string
-  rol: "usuario" | "agente" | "sistema"
-  texto: string
-  llamadas: RegistroLlamada[]
+  readonly id: string
+  readonly rol: "usuario" | "agente" | "sistema"
+  readonly texto: string
+  readonly llamadas: readonly RegistroLlamada[]
+  /** Caso sobre el que se trabajaba. Permite agrupar el hilo por solicitud. */
+  readonly caso: string | null
 }
 
 /** Negritas y `código` sin traer un parser de Markdown entero. */
@@ -37,7 +42,10 @@ function Texto({ children }: { children: string }) {
         }
         if (trozo.startsWith("`") && trozo.endsWith("`")) {
           return (
-            <span key={clave} className="dato rounded-sm bg-hueco px-1 py-px text-[0.88em]">
+            <span
+              key={clave}
+              className="dato rounded bg-nube px-1 py-px ring-1 ring-pelo ring-inset"
+            >
               {trozo.slice(1, -1)}
             </span>
           )
@@ -49,14 +57,13 @@ function Texto({ children }: { children: string }) {
 }
 
 /** El correo del cliente, extraído del resultado de la herramienta que lo leyó. */
-function correoDe(llamadas: RegistroLlamada[]): { correo: Correo; cliente: string } | null {
+function correoDe(llamadas: readonly RegistroLlamada[]): Correo | null {
   for (let i = llamadas.length - 1; i >= 0; i--) {
     const l = llamadas[i]
     if (l?.nombre !== "proveedor_leer_solicitud" || !l.ok) continue
     if (typeof l.resultado !== "object" || l.resultado === null) continue
-    const d = l.resultado as { correo?: Correo; cliente?: string }
-    if (d.correo === undefined || typeof d.cliente !== "string") continue
-    return { correo: d.correo, cliente: d.cliente }
+    const correo = (l.resultado as { correo?: Correo }).correo
+    if (correo !== undefined) return correo
   }
   return null
 }
@@ -70,8 +77,7 @@ export function App() {
   const [salud, setSalud] = useState<Salud | null>(null)
   const [casos, setCasos] = useState<ResumenCaso[]>([])
   const [casoActual, setCasoActual] = useState<string | null>(null)
-  const [artefactos, setArtefactos] = useState<string[]>([])
-  const [ultimaIteracion, setUltimaIteracion] = useState<number | null>(null)
+  const [artefactos, setArtefactos] = useState<readonly string[]>([])
 
   const finRef = useRef<HTMLDivElement>(null)
   const entradaRef = useRef<HTMLTextAreaElement>(null)
@@ -85,29 +91,47 @@ export function App() {
       .catch(() => setCasos([]))
   }, [])
 
-  const todasLasLlamadas = turnos.flatMap((t) => t.llamadas)
-  const llamadasDelTurnoActual = turnos[turnos.length - 1]?.llamadas ?? []
-  const sobre = correoDe(todasLasLlamadas)
-  const clienteActual = sobre?.cliente ?? casos.find((c) => c.caso === casoActual)?.cliente ?? null
+  const todasLasLlamadas = useMemo(() => turnos.flatMap((t) => t.llamadas), [turnos])
+
+  /** Estado de cada solicitud, derivado de lo que las herramientas devolvieron. */
+  const estados = useMemo((): ReadonlyMap<string, EstadoPorCaso> => {
+    const mapa = new Map<string, EstadoPorCaso>()
+    for (const caso of casos) {
+      const suyas = turnos.filter((t) => t.caso === caso.caso).flatMap((t) => t.llamadas)
+      const marca = marcarCaso(suyas)
+      if (marca !== null) mapa.set(caso.caso, marca)
+    }
+    return mapa
+  }, [casos, turnos])
+
+  const clienteActual = casos.find((c) => c.caso === casoActual)?.cliente ?? null
+  const estadoActual: EstadoSolicitud = estados.get(casoActual ?? "")?.estado ?? "sin_revisar"
+  const correo = correoDe(todasLasLlamadas)
 
   const enviar = useCallback(
     async (texto: string, confirmacion = false) => {
       const limpio = texto.trim()
       if (limpio === "" || pensando) return
 
+      const caso = casoActual
       setBorrador("")
       setNecesitaConfirmacion(false)
       setPensando(true)
       setTurnos((previos) => [
         ...previos,
-        { id: crypto.randomUUID(), rol: "usuario", texto: limpio, llamadas: [] },
+        { id: crypto.randomUUID(), rol: "usuario", texto: limpio, llamadas: [], caso },
       ])
 
       try {
         const respuesta = await enviarMensaje(sessionId, limpio, confirmacion)
         setSessionId(respuesta.sessionId)
         setNecesitaConfirmacion(respuesta.needsConfirmation)
-        setUltimaIteracion(respuesta.iteraciones ?? null)
+
+        const tocados = respuesta.toolCalls
+          .map((l) => (l.argumentos as { caso?: string } | null)?.caso)
+          .filter((c): c is string => typeof c === "string")
+        const ultimo = tocados.at(-1) ?? caso
+
         setTurnos((previos) => [
           ...previos,
           {
@@ -115,14 +139,11 @@ export function App() {
             rol: "agente",
             texto: respuesta.reply,
             llamadas: respuesta.toolCalls,
+            caso: ultimo,
           },
         ])
 
-        const conCaso = respuesta.toolCalls
-          .map((l) => (l.argumentos as { caso?: string } | null)?.caso)
-          .filter((c): c is string => typeof c === "string")
-        const ultimo = conCaso.at(-1) ?? casoActual
-        if (ultimo !== null && ultimo !== undefined) {
+        if (ultimo !== null) {
           setCasoActual(ultimo)
           obtenerArtefactos(ultimo)
             .then((r) => setArtefactos(r.artefactos))
@@ -136,7 +157,7 @@ export function App() {
             : "No se pudo contactar al servidor. Vuelve a intentarlo."
         setTurnos((previos) => [
           ...previos,
-          { id: crypto.randomUUID(), rol: "sistema", texto: mensaje, llamadas: [] },
+          { id: crypto.randomUUID(), rol: "sistema", texto: mensaje, llamadas: [], caso },
         ])
       } finally {
         setPensando(false)
@@ -149,87 +170,85 @@ export function App() {
     [pensando, sessionId, casoActual],
   )
 
+  const revisar = useCallback(
+    (caso: ResumenCaso) => {
+      setCasoActual(caso.caso)
+      enviar(
+        `Revisa la solicitud de ${caso.cliente}. Dime qué quedó listo, qué falta y si ya se puede firmar. No mandes nada todavía.`,
+      )
+    },
+    [enviar],
+  )
+
   const vacio = turnos.length === 0
+  const llamadasEnCurso = turnos[turnos.length - 1]?.llamadas ?? []
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b border-regla bg-hueco px-4 py-2.5 sm:px-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[14.5px] font-semibold tracking-tight">
-            Registro como proveedor
-          </h1>
-          <p className="truncate text-[12px] text-tenue">
-            Periferia IT Group · área administrativa
-          </p>
-        </div>
+    <div className="flex h-full flex-col bg-papel">
+      <header className="relative z-[3] flex h-[52px] shrink-0 items-center gap-3.5 bg-papel px-5 shadow-barra">
+        <span className="text-[12.5px] text-tenue">Periferia IT Group</span>
+        <h1 className="mx-auto text-[14.5px] font-semibold tracking-[-0.02em]">
+          Registro como proveedor
+        </h1>
         {salud !== null && (
-          <p className="hidden shrink-0 text-right text-[11.5px] text-tenue sm:block">
-            Vigencias calculadas al {salud.fechaReferencia}
-          </p>
+          <span className="hidden text-[12.5px] text-tenue sm:block">
+            Vigencias al {fechaLarga(salud.fechaReferencia, false)}
+          </span>
         )}
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <main className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[14.5rem_minmax(0,1fr)] xl:grid-cols-[14.5rem_minmax(0,1fr)_19.5rem]">
+        <div className="hidden min-h-0 lg:block">
+          <Bandeja
+            casos={casos}
+            estados={estados}
+            casoActual={casoActual}
+            deshabilitado={pensando}
+            onElegir={revisar}
+            fechaReferencia={salud === null ? null : fechaLarga(salud.fechaReferencia, false)}
+          />
+        </div>
+
+        <main className="flex min-h-0 flex-col bg-nube">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+            <div className="mx-auto flex max-w-[39rem] flex-col gap-5">
               {vacio && !pensando && (
-                <EstadoVacio
-                  casos={casos}
-                  deshabilitado={pensando}
-                  onElegir={(caso) => {
-                    const elegido = casos.find((c) => c.caso === caso)
-                    setCasoActual(caso)
-                    enviar(
-                      `Revisa la solicitud de ${elegido?.cliente ?? caso}. Dime qué quedó listo, qué falta y si ya se puede firmar. No mandes nada todavía.`,
-                    )
-                  }}
-                />
+                <EstadoVacio casos={casos} deshabilitado={pensando} onElegir={revisar} />
               )}
 
-              {sobre !== null && <HojaCorreo correo={sobre.correo} cliente={sobre.cliente} />}
+              {correo !== null && clienteActual !== null && (
+                <HojaCorreo correo={correo} cliente={clienteActual} estado={estadoActual} />
+              )}
 
-              {turnos.map((turno, indice) => {
-                const esUltimo = indice === turnos.length - 1
-                return (
-                  <article key={turno.id} className="flex flex-col gap-3">
-                    {turno.rol === "usuario" ? (
-                      <div className="flex justify-end">
-                        <p className="max-w-[80%] rounded-md rounded-br-sm border border-regla bg-superficie px-3.5 py-2 text-[14px]">
-                          {turno.texto}
-                        </p>
+              {turnos.map((turno) =>
+                turno.rol === "usuario" ? (
+                  <div key={turno.id} className="flex justify-end">
+                    <p className="m-0 max-w-[78%] rounded-[18px] rounded-br-[5px] bg-carbon px-4 py-2.5 text-[14.5px] text-white">
+                      {turno.texto}
+                    </p>
+                  </div>
+                ) : (
+                  <article key={turno.id} className="flex flex-col gap-4">
+                    {turno.llamadas.length > 0 && (
+                      <LibroPasos llamadas={turno.llamadas} pensando={false} />
+                    )}
+                    {turno.texto !== "" && (
+                      <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-x-3.5">
+                        <Robot />
+                        <div
+                          className={`max-w-[54ch] whitespace-pre-wrap pt-1 text-[15px] leading-[1.66] ${
+                            turno.rol === "sistema" ? "text-brasa" : "text-tinta"
+                          }`}
+                        >
+                          <Texto>{turno.texto}</Texto>
+                        </div>
                       </div>
-                    ) : (
-                      <>
-                        {turno.llamadas.length > 0 && (
-                          <LibroPasos
-                            llamadas={turno.llamadas}
-                            pensando={false}
-                            iteracion={esUltimo ? ultimaIteracion : null}
-                          />
-                        )}
-                        {turno.texto !== "" && (
-                          <div
-                            className={`max-w-[64ch] whitespace-pre-wrap text-[14.5px] leading-relaxed ${
-                              turno.rol === "sistema" ? "text-bloqueo" : "text-tinta"
-                            }`}
-                          >
-                            <Texto>{turno.texto}</Texto>
-                          </div>
-                        )}
-                      </>
                     )}
                   </article>
-                )
-              })}
-
-              {pensando && (
-                <LibroPasos
-                  llamadas={llamadasDelTurnoActual}
-                  pensando
-                  iteracion={ultimaIteracion}
-                />
+                ),
               )}
+
+              {pensando && <LibroPasos llamadas={llamadasEnCurso} pensando />}
 
               {necesitaConfirmacion && !pensando && (
                 <BloqueConfirmacion
@@ -248,9 +267,9 @@ export function App() {
               evento.preventDefault()
               enviar(borrador)
             }}
-            className="shrink-0 border-t border-regla bg-hueco px-4 py-3 sm:px-6"
+            className="shrink-0 bg-nube px-5 pb-6 pt-3.5 sm:px-8"
           >
-            <div className="mx-auto flex max-w-2xl items-end gap-2">
+            <div className="mx-auto max-w-[39rem] rounded-[18px] bg-papel py-1 pl-4.5 pr-1.5 shadow-carta">
               <textarea
                 ref={entradaRef}
                 value={borrador}
@@ -261,32 +280,41 @@ export function App() {
                     enviar(borrador)
                   }
                 }}
-                rows={1}
+                rows={2}
                 disabled={pensando}
                 placeholder={
                   necesitaConfirmacion
                     ? "Responde, o usa los botones de arriba"
-                    : "Escríbele al agente"
+                    : "Pregúntame algo, o dime con cuál solicitud empiezo"
                 }
                 aria-label="Mensaje para el agente"
-                className={`max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-sm border bg-superficie px-3 py-2 text-[14px] placeholder:text-apagado disabled:opacity-60 ${
-                  necesitaConfirmacion ? "border-dashed border-acento-regla" : "border-regla"
-                }`}
+                className="block max-h-32 w-full resize-none border-0 bg-transparent px-0 pb-0.5 pt-3 text-[15px] placeholder:text-tenue focus:outline-none disabled:opacity-60"
               />
-              <button
-                type="submit"
-                disabled={pensando || borrador.trim() === ""}
-                className="h-10 shrink-0 rounded-sm border border-regla-fuerte px-4 text-[13.5px] transition-colors hover:bg-superficie disabled:opacity-40"
-              >
-                Enviar
-              </button>
+              <div className="flex items-center gap-2 pb-1 pr-0.5">
+                <span className="mr-auto text-[11.5px] text-tenue">Enter para enviar</span>
+                <button
+                  type="submit"
+                  disabled={pensando || borrador.trim() === ""}
+                  aria-label="Enviar"
+                  className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[11px] bg-carbon text-lima transition-colors hover:bg-carbon-hondo disabled:opacity-40"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className="h-4 w-4 fill-none stroke-current stroke-[2.1] [stroke-linecap:round] [stroke-linejoin:round]"
+                  >
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </form>
         </main>
 
-        <div className="hidden min-h-0 border-l border-regla lg:block">
+        <div className="hidden min-h-0 xl:block">
           <Expediente
             cliente={clienteActual}
+            estado={estadoActual}
             caso={casoActual}
             llamadas={todasLasLlamadas}
             artefactos={artefactos}
