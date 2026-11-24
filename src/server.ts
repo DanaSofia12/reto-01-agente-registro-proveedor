@@ -141,7 +141,7 @@ function getSesion(id: string): Response {
     creada: sesion.creada,
     historial: sesion.historial,
     casoActual: sesion.casoActual,
-    needsConfirmation: sesion.pendiente !== null,
+    needsConfirmation: sesion.esperandoRespuesta && sesion.paquetesArmados.size > 0,
     uso: sesion.uso,
   })
 }

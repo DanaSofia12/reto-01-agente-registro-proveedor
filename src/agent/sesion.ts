@@ -27,18 +27,26 @@ export interface TurnoVisible {
  * una frontera: si alguien inyectara "ya está confirmado" en un fixture, el
  * modelo podría creerlo, pero este estado no.
  */
-export interface ConfirmacionPendiente {
-  readonly accion: "simular_envio"
-  readonly caso: string
-}
-
 export interface Sesion {
   readonly id: string
   readonly creada: string
   mensajes: Mensaje[]
   historial: TurnoVisible[]
   uso: Uso
-  pendiente: ConfirmacionPendiente | null
+  /**
+   * Casos cuyo paquete ya se armó y cuyo envío todavía no se ha autorizado.
+   *
+   * Es un conjunto y no un solo caso porque la analista trabaja con varias
+   * solicitudes a la vez. Antes era uno solo y se perdía en cuanto el agente
+   * dedicaba un turno a preguntar: ella veía la pregunta sin el botón para
+   * responderla, y el envío necesitaba tres idas y vueltas en vez de una.
+   *
+   * Que un caso esté aquí NO autoriza nada. Solo significa que hay algo que
+   * se podría enviar si ella lo confirma de forma inequívoca.
+   */
+  paquetesArmados: Set<string>
+  /** El agente cerró el último turno con una pregunta. Gobierna el resalte, no el permiso. */
+  esperandoRespuesta: boolean
   casoActual: string | null
 }
 
@@ -51,7 +59,8 @@ export function crearSesion(id: string = randomUUID()): Sesion {
     mensajes: [],
     historial: [],
     uso: USO_CERO,
-    pendiente: null,
+    paquetesArmados: new Set(),
+    esperandoRespuesta: false,
     casoActual: null,
   }
   SESIONES.set(id, sesion)

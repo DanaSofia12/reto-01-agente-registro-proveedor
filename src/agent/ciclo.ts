@@ -110,9 +110,12 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     // antes de que el modelo tenga ocasión de interpretarlo a su manera.
     // Dos canales: el botón del front manda `confirmacion: true` de forma
     // inequívoca; el texto libre solo confirma si no deja lugar a duda.
-    const pendiente = sesion.pendiente
-    const confirmadoAhora = pendiente !== null && (confirmacionExplicita || esConfirmacion(mensaje))
-    sesion.pendiente = null
+    // Se fotografía al abrir el turno: nada que se arme DENTRO de este turno
+    // puede autorizarse en él. Arrancar y disparar en el mismo turno sigue
+    // siendo imposible, que es la propiedad que protege RN4.
+    const autorizables = new Set(sesion.paquetesArmados)
+    const confirmadoAhora =
+      autorizables.size > 0 && (confirmacionExplicita || esConfirmacion(mensaje))
 
     sesion.mensajes.push({ rol: "usuario", texto: mensaje })
     sesion.historial.push({
@@ -125,7 +128,6 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     const llamadasDelTurno: RegistroLlamada[] = []
     let iteracion = 0
     let respuestaFinal = ""
-    let nuevaPendiente: Sesion["pendiente"] = null
 
     while (iteracion < config.MAX_ITERACIONES_TURNO) {
       // NFR Costo — tope acumulado por sesión.
@@ -188,13 +190,12 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
       const resultados: ResultadoHerramienta[] = []
       for (const llamada of respuesta.llamadas) {
         const registro = await ejecutarLlamada(llamada, ctx, {
-          pendiente,
+          autorizables,
           confirmadoAhora,
           sesion,
         })
         llamadasDelTurno.push(registro.visible)
         resultados.push({ id: llamada.id, contenido: registro.crudo })
-        if (registro.pendiente !== null) nuevaPendiente = registro.pendiente
       }
 
       // Todos los tool_result en UN solo mensaje: repartirlos entre varios
@@ -215,8 +216,12 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     // CA3 condiciona el resaltado a que el agente TERMINE el turno con una
     // pregunta. Si no preguntó —por ejemplo porque la analista dijo "no envíes
     // nada todavía"— no hay nada que confirmar y el front no debe insistir.
-    const preguntó = respuestaFinal.includes("?") || respuestaFinal.includes("¿")
-    sesion.pendiente = preguntó ? nuevaPendiente : null
+    //
+    // El resalte es de interfaz; el permiso es `paquetesArmados` más una
+    // confirmación inequívoca. Separarlos es lo que arregla el caso en que el
+    // agente dedica un turno entero a preguntar: antes la pregunta salía sin
+    // su botón porque ese turno no armaba ningún paquete nuevo.
+    sesion.esperandoRespuesta = respuestaFinal.includes("?") || respuestaFinal.includes("¿")
 
     sesion.historial.push({
       rol: "agente",
@@ -228,7 +233,7 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
     return {
       reply: respuestaFinal,
       toolCalls: llamadasDelTurno,
-      needsConfirmation: sesion.pendiente !== null,
+      needsConfirmation: sesion.esperandoRespuesta && sesion.paquetesArmados.size > 0,
       sessionId: sesion.id,
       uso: {
         tokensEntrada: sesion.uso.tokensEntrada,
@@ -242,7 +247,8 @@ export function crearCiclo({ raiz, proveedor }: OpcionesCiclo) {
 }
 
 interface ContextoConfirmacion {
-  readonly pendiente: Sesion["pendiente"]
+  /** Casos con paquete armado al EMPEZAR el turno. */
+  readonly autorizables: ReadonlySet<string>
   readonly confirmadoAhora: boolean
   readonly sesion: Sesion
 }
@@ -251,7 +257,7 @@ async function ejecutarLlamada(
   llamada: LlamadaHerramienta,
   ctx: ContextoHerramienta,
   confirmacion: ContextoConfirmacion,
-): Promise<{ crudo: string; visible: RegistroLlamada; pendiente: Sesion["pendiente"] }> {
+): Promise<{ crudo: string; visible: RegistroLlamada }> {
   const herramienta = buscarHerramienta(llamada.nombre)
   const caso = extraerCaso(llamada.argumentos)
   if (caso !== null) confirmacion.sesion.casoActual = caso
@@ -268,7 +274,6 @@ async function ejecutarLlamada(
         resumen: "herramienta desconocida",
         resultado: null,
       },
-      pendiente: null,
     }
   }
 
@@ -280,10 +285,7 @@ async function ejecutarLlamada(
   // false y la herramienta responde el rechazo del contrato.
   if (ACCIONES_EXTERNAS.has(llamada.nombre)) {
     const autorizado =
-      confirmacion.pendiente !== null &&
-      confirmacion.pendiente.accion === "simular_envio" &&
-      confirmacion.confirmadoAhora &&
-      (caso === null || caso === confirmacion.pendiente.caso)
+      confirmacion.confirmadoAhora && caso !== null && confirmacion.autorizables.has(caso)
 
     if (typeof argumentos === "object" && argumentos !== null) {
       argumentos = { ...(argumentos as Record<string, unknown>), confirmado: autorizado }
@@ -293,14 +295,15 @@ async function ejecutarLlamada(
   const crudo = await herramienta.ejecutar(argumentos, ctx)
   const { ok, resumen, datos } = resumirResultado(crudo)
 
-  // Tras armar el paquete queda una acción externa posible: el envío. Se arma
-  // la confirmación para que el front la resalte y el gate quede activo.
-  let pendiente: Sesion["pendiente"] = null
-  if (ok && llamada.nombre === "proveedor_armar_paquete" && caso !== null) {
-    pendiente = { accion: "simular_envio", caso }
-  }
-  if (!ok && llamada.nombre === "proveedor_simular_envio" && caso !== null) {
-    pendiente = { accion: "simular_envio", caso }
+  // Armar el paquete deja una acción externa posible. Enviarlo la consume:
+  // sin esto, un "sí" posterior reenviaría un caso ya despachado.
+  if (caso !== null) {
+    if (ok && llamada.nombre === "proveedor_armar_paquete") {
+      confirmacion.sesion.paquetesArmados.add(caso)
+    }
+    if (ok && llamada.nombre === "proveedor_simular_envio") {
+      confirmacion.sesion.paquetesArmados.delete(caso)
+    }
   }
 
   return {
@@ -313,6 +316,5 @@ async function ejecutarLlamada(
       resumen,
       resultado: datos,
     },
-    pendiente,
   }
 }

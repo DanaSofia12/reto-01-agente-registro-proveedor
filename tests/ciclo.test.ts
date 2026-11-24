@@ -102,7 +102,8 @@ describe("CA3 / RN4 — la confirmación la impone el servidor", () => {
     const resultado = await ejecutar(sesion, "arma el paquete de co-industrias-delta")
 
     expect(resultado.needsConfirmation).toBe(true)
-    expect(sesion.pendiente).toEqual({ accion: "simular_envio", caso: "co-industrias-delta" })
+    expect([...sesion.paquetesArmados]).toEqual(["co-industrias-delta"])
+    expect(sesion.esperandoRespuesta).toBe(true)
   })
 
   test("con el turno anterior esperando y un sí explícito, el envío procede", async () => {
@@ -118,7 +119,7 @@ describe("CA3 / RN4 — la confirmación la impone el servidor", () => {
       { texto: "Listo para firma. ¿Preparo el envío simulado?", llamadas: [] },
     ])
     await turno1(sesion, "procesa co-industrias-delta")
-    expect(sesion.pendiente).not.toBeNull()
+    expect(sesion.paquetesArmados.has("co-industrias-delta")).toBe(true)
 
     const turno2 = ciclo([
       {
@@ -318,8 +319,11 @@ describe("CA3 — no se resalta confirmación si el agente no preguntó", () => 
     const sesion = crearSesion("sin-pregunta")
     const resultado = await ejecutar(sesion, "procesa co-industrias-delta, no envíes nada todavía")
 
+    // El paquete quedó armado —eso es un hecho—, pero el agente no preguntó,
+    // así que la interfaz no debe insistir con un botón que nadie pidió.
     expect(resultado.needsConfirmation).toBe(false)
-    expect(sesion.pendiente).toBeNull()
+    expect(sesion.esperandoRespuesta).toBe(false)
+    expect(sesion.paquetesArmados.has("co-industrias-delta")).toBe(true)
   })
 })
 
@@ -339,5 +343,136 @@ describe("CA4 — las llamadas rechazadas por validación también se registran"
     expect(resultado.toolCalls[0]?.ok).toBe(false)
     expect(resultado.toolCalls[0]?.resumen).toContain("argumentos inválidos")
     expect(existsSync(path.join(RAIZ, "out/log.jsonl"))).toBe(true)
+  })
+})
+
+describe("la pregunta sobrevive a un turno sin herramientas", () => {
+  /**
+   * El defecto que esto cubre: con dos solicitudes abiertas, la analista dice
+   * «envíalo», el agente dedica un turno entero a preguntar cuál —sin llamar a
+   * ninguna herramienta— y la confirmación se evaporaba. Ella veía la pregunta
+   * sin el botón para responderla, y el envío necesitaba tres idas y vueltas.
+   */
+  test("tras preguntar sin ejecutar nada, el botón sigue disponible y autoriza", async () => {
+    const sesion = crearSesion("pregunta-sola")
+
+    const armar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          { nombre: "proveedor_armar_paquete", argumentos: { caso: "co-industrias-delta" } },
+        ],
+      },
+      { texto: "El paquete quedó listo. No envié nada.", llamadas: [] },
+    ])
+    await armar(sesion, "prepara co-industrias-delta")
+
+    // Turno intermedio: solo pregunta. Ninguna herramienta corre.
+    const preguntar = ciclo([
+      { texto: "¿Te refieres a Industrias Delta? ¿Confirmas el envío?", llamadas: [] },
+    ])
+    const intermedio = await preguntar(sesion, "envialo")
+
+    expect(intermedio.toolCalls).toHaveLength(0)
+    expect(intermedio.needsConfirmation).toBe(true)
+
+    // Y el sí posterior sí autoriza, sin un rebote extra.
+    const enviar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          {
+            nombre: "proveedor_simular_envio",
+            argumentos: { caso: "co-industrias-delta", confirmado: true },
+          },
+        ],
+      },
+      { texto: "Constancia registrada.", llamadas: [] },
+    ])
+    const final = await enviar(sesion, "Sí, adelante.", true)
+
+    const envio = final.toolCalls.find((l) => l.nombre === "proveedor_simular_envio")
+    expect(envio?.ok).toBe(true)
+    expect(existsSync(path.join(RAIZ, "out/co-industrias-delta/ENVIO-SIMULADO.md"))).toBe(true)
+  })
+
+  test("un caso ya enviado no se reenvía con un sí posterior", async () => {
+    const sesion = crearSesion("no-reenvia")
+
+    const armar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          { nombre: "proveedor_armar_paquete", argumentos: { caso: "co-industrias-delta" } },
+        ],
+      },
+      { texto: "Listo. ¿Lo envío?", llamadas: [] },
+    ])
+    await armar(sesion, "prepara co-industrias-delta")
+
+    const enviar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          {
+            nombre: "proveedor_simular_envio",
+            argumentos: { caso: "co-industrias-delta", confirmado: true },
+          },
+        ],
+      },
+      { texto: "Hecho. ¿Algo más?", llamadas: [] },
+    ])
+    await enviar(sesion, "Sí, adelante.", true)
+    expect(sesion.paquetesArmados.size).toBe(0)
+
+    // Un "sí" suelto después ya no tiene nada que autorizar.
+    const otraVez = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          {
+            nombre: "proveedor_simular_envio",
+            argumentos: { caso: "co-industrias-delta", confirmado: true },
+          },
+        ],
+      },
+      { texto: "No pude reenviarlo.", llamadas: [] },
+    ])
+    const repetido = await otraVez(sesion, "Sí, adelante.", true)
+    const envio = repetido.toolCalls.find((l) => l.nombre === "proveedor_simular_envio")
+    expect(envio?.ok).toBe(false)
+  })
+
+  test("un agradecimiento genérico sigue sin autorizar, aunque haya paquete armado", async () => {
+    const sesion = crearSesion("gracias-no-basta")
+
+    const armar = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          { nombre: "proveedor_armar_paquete", argumentos: { caso: "co-industrias-delta" } },
+        ],
+      },
+      { texto: "Listo. ¿Lo envío?", llamadas: [] },
+    ])
+    await armar(sesion, "prepara co-industrias-delta")
+
+    const intento = ciclo([
+      {
+        texto: "",
+        llamadas: [
+          {
+            nombre: "proveedor_simular_envio",
+            argumentos: { caso: "co-industrias-delta", confirmado: true },
+          },
+        ],
+      },
+      { texto: "No quedó autorizado.", llamadas: [] },
+    ])
+    const resultado = await intento(sesion, "ok, gracias")
+
+    const envio = resultado.toolCalls.find((l) => l.nombre === "proveedor_simular_envio")
+    expect(envio?.ok).toBe(false)
+    expect(existsSync(path.join(RAIZ, "out/co-industrias-delta/ENVIO-SIMULADO.md"))).toBe(false)
   })
 })
