@@ -179,8 +179,21 @@ function tabla(filas: Fila[]): void {
   for (const fila of cuerpo) console.log(linea(fila))
 }
 
+/**
+ * Fecha para la que se diseñaron los fixtures.
+ *
+ * `demo.ts` la usa cuando no hay `FECHA_REFERENCIA` en el entorno, por dos
+ * razones. La primera es el requisito de determinismo: con la fecha del
+ * sistema el resultado cambia según el día en que se ejecute. La segunda es
+ * que con la fecha de hoy los cuatro casos salen bloqueados por la cámara de
+ * comercio, y quien clone el repositorio y corra esto sin configurar nada
+ * concluiría que está roto.
+ */
+const FECHA_DE_LOS_FIXTURES = "2026-09-03"
+
 async function principal(): Promise<void> {
-  const fecha = fechaReferencia()
+  const configurada = (process.env.FECHA_REFERENCIA ?? "").trim() !== ""
+  const fecha = configurada ? fechaReferencia() : new Date(`${FECHA_DE_LOS_FIXTURES}T00:00:00Z`)
   const ctx: ContextoHerramienta = {
     directory: RAIZ,
     sessionId: "demo",
@@ -189,8 +202,9 @@ async function principal(): Promise<void> {
 
   console.log(`${C.negrita}Agente de registro como proveedor — verificación sin modelo${C.reset}`)
   console.log(
-    `${C.tenue}Fecha de referencia: ${fecha.toISOString().slice(0, 10)}  ·  Herramientas: ${HERRAMIENTAS.map((h) => h.nombre).join(", ")}${C.reset}`,
+    `${C.tenue}Fecha de referencia: ${fecha.toISOString().slice(0, 10)}${configurada ? "" : " (la de los fixtures; cámbiala con FECHA_REFERENCIA)"}${C.reset}`,
   )
+  console.log(`${C.tenue}Herramientas: ${HERRAMIENTAS.map((h) => h.nombre).join(", ")}${C.reset}`)
 
   limpiarSalida(RAIZ)
 
