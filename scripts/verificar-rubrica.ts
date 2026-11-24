@@ -3,7 +3,7 @@
  * Ejecuta los criterios verificables de la rúbrica e imprime un semáforo.
  *
  * Es el comando que se corre antes de entregar. Lo que no se puede comprobar
- * desde aquí (el tono del prompt, cómo se ve el front) queda fuera a propósito:
+ * desde aquí (el tono del prompt, la estética del front) queda fuera a propósito:
  * un verificador que dice "ok" sobre algo que no midió es peor que no tenerlo.
  */
 
@@ -367,6 +367,42 @@ const CRITERIOS: readonly Criterio[] = [
       if (linea === "") return false
       const e = JSON.parse(linea) as { ok?: boolean; resumen?: string }
       return e.ok === false && (e.resumen ?? "").includes("argumentos inválidos")
+    },
+  },
+
+  // ─── D · lo que el front está obligado a mostrar ────────────────────────────
+  {
+    id: "D6",
+    descripcion: "el front muestra nombre, argumentos y resultado de cada llamada",
+    comprobar: () => {
+      // §6.1 lo exige explícitamente. Se perdió una vez al reemplazar las
+      // tarjetas técnicas por frases humanas, y la rúbrica no lo vio.
+      const pasos = contenido("web/src/componentes/LibroPasos.tsx")
+      return (
+        /llamada\.nombre/.test(pasos) &&
+        /argumentosLegibles\(llamada\.argumentos\)/.test(pasos) &&
+        /llamada\.resumen/.test(pasos)
+      )
+    },
+  },
+  {
+    id: "D7",
+    descripcion: "el front resalta el estado de confirmación con su propio bloque",
+    comprobar: () => {
+      const app = contenido("web/src/App.tsx")
+      return (
+        /necesitaConfirmacion/.test(app) &&
+        existsSync(archivo("web/src/componentes/BloqueConfirmacion.tsx"))
+      )
+    },
+  },
+  {
+    id: "D8",
+    descripcion: "la analista puede leer el correo del cliente antes de procesarlo",
+    comprobar: () => {
+      const servidor = contenido("src/server.ts")
+      const api = contenido("web/src/api.ts")
+      return /correo:\s*\{/.test(servidor) && /CorreoRecibido/.test(api)
     },
   },
 

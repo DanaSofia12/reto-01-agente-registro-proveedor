@@ -1,35 +1,27 @@
 import { useState } from "react"
+import type { CorreoRecibido } from "../api.ts"
 import { fechaLarga } from "../lenguaje.ts"
 import { Avatar, type EstadoSolicitud } from "./Avatar.tsx"
 
 /**
- * El correo que mandó el cliente, tal como llegó.
+ * El correo del cliente, tal como llegó.
  *
- * Antes el agente lo leía y la analista nunca lo veía: tenía que creerle cuando
- * decía «el cliente exige tal certificado». Ahora la frase está ahí, escrita por
- * el cliente, a un centímetro de la afirmación.
- *
- * Se renderiza como correspondencia —con remitente y una regla al costado— y no
- * como una tarjeta, porque eso es lo que es.
+ * Se muestra en cuanto se elige la solicitud, antes de pedirle nada al agente:
+ * la analista lo lee igual que abriría el correo real. Antes solo aparecía
+ * después de que el agente lo procesara, lo que obligaba a confiar en su
+ * resumen sin haber visto la fuente.
  */
-
-export interface Correo {
-  de: string
-  para: string
-  asunto: string
-  fecha: string
-  cuerpo: string
-  adjuntos: string[]
-}
-
 export function HojaCorreo({
   correo,
   cliente,
   estado,
+  onRevisar,
 }: {
-  correo: Correo
+  correo: CorreoRecibido
   cliente: string
   estado: EstadoSolicitud
+  /** Si se pasa, ofrece pedirle al agente que la procese. */
+  onRevisar?: () => void
 }) {
   const [abierto, setAbierto] = useState(true)
   const parrafos = correo.cuerpo.split("\n").filter((p) => p.trim() !== "")
@@ -38,11 +30,14 @@ export function HojaCorreo({
     <article className="grid grid-cols-[34px_minmax(0,1fr)] gap-x-3.5">
       <Avatar cliente={cliente} estado={estado} />
       <div className="-ml-[3px] min-w-0 border-l-2 border-pelo pl-4">
-        <p className="m-0 mb-1 flex items-baseline gap-3 text-[12.5px] text-tenue">
+        <p className="m-0 mb-1 flex flex-wrap items-baseline gap-x-3 text-[12.5px] text-tenue">
           <span className="min-w-0 truncate">{cliente}</span>
-          <span className="ml-auto shrink-0">{fechaLarga(correo.fecha, false)}</span>
+          <span className="shrink-0">{fechaLarga(correo.fecha, false)}</span>
         </p>
-        <h2 className="titular m-0 mb-2 text-[19px]">{correo.asunto}</h2>
+        <h2 className="titular m-0 mb-1 text-[19px]">{correo.asunto}</h2>
+        <p className="dato m-0 mb-3 truncate text-[11px] text-tenue" title={correo.de}>
+          {correo.de}
+        </p>
 
         {abierto && (
           <>
@@ -65,14 +60,34 @@ export function HojaCorreo({
           </>
         )}
 
-        <button
-          type="button"
-          onClick={() => setAbierto((v) => !v)}
-          aria-expanded={abierto}
-          className="mt-2.5 block text-[12.5px] text-prosa hover:underline"
-        >
-          {abierto ? "Ocultar el correo" : "Ver el correo completo"}
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">
+          {onRevisar !== undefined && (
+            <button
+              type="button"
+              onClick={onRevisar}
+              className="inline-flex items-center gap-2.5 rounded-full bg-carbon py-2 pl-4 pr-2 text-[13.5px] font-semibold tracking-[-0.015em] text-lima transition-colors hover:bg-carbon-hondo"
+            >
+              Pídele al agente que la revise
+              <span className="grid h-6 w-6 place-items-center rounded-lg bg-lima/20">
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 fill-none stroke-lima stroke-[2.2] [stroke-linecap:round] [stroke-linejoin:round]"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            aria-expanded={abierto}
+            className="text-[12.5px] text-prosa hover:underline"
+          >
+            {abierto ? "Ocultar el correo" : "Ver el correo completo"}
+          </button>
+        </div>
       </div>
     </article>
   )

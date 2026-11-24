@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { RegistroLlamada } from "../api.ts"
 import { accion, lista, nombrePais } from "../lenguaje.ts"
 
@@ -10,7 +11,21 @@ import { accion, lista, nombrePais } from "../lenguaje.ts"
  *
  * Se numera porque es una secuencia real: cada línea es una iteración del bucle
  * del agente, no un indicador de progreso decorativo.
+ *
+ * Cada paso se puede desplegar para ver el nombre de la herramienta, sus
+ * argumentos y el resultado resumido. Esa vista es obligatoria —el reto la
+ * evalúa— pero va plegada: quien hace este trabajo no la necesita, y quien
+ * audita sí.
  */
+
+/** Argumentos en una línea, legibles sin ser JSON crudo. */
+function argumentosLegibles(argumentos: unknown): string {
+  if (typeof argumentos !== "object" || argumentos === null) return "sin argumentos"
+  const pares = Object.entries(argumentos as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : JSON.stringify(v)}`)
+  return pares.length === 0 ? "sin argumentos" : pares.join(", ")
+}
 
 /** El resultado de cada herramienta, contado como se lo contarías a una persona. */
 function resultadoLegible(llamada: RegistroLlamada): string {
@@ -77,6 +92,7 @@ export function LibroPasos({
             titulo={accion(llamada.nombre)}
             detalle={resultadoLegible(llamada)}
             ok={llamada.ok}
+            llamada={llamada}
           />
         ))}
         {pensando && (
@@ -99,13 +115,16 @@ function Paso({
   detalle,
   ok,
   corriendo = false,
+  llamada,
 }: {
   numero: number
   titulo: string
   detalle: string | null
   ok: boolean
   corriendo?: boolean
+  llamada?: RegistroLlamada
 }) {
+  const [abierto, setAbierto] = useState(false)
   const ficha = corriendo
     ? "latiendo bg-lima text-carbon"
     : ok
@@ -129,6 +148,31 @@ function Paso({
           >
             {detalle}
           </span>
+        )}
+
+        {llamada !== undefined && (
+          <>
+            <button
+              type="button"
+              onClick={() => setAbierto((v) => !v)}
+              aria-expanded={abierto}
+              className="mt-1 text-[11.5px] text-tenue hover:text-prosa hover:underline"
+            >
+              {abierto ? "Ocultar el detalle" : "Ver el detalle"}
+            </button>
+            {abierto && (
+              <dl className="dato mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-[10px] bg-papel px-3 py-2.5 text-[11px] ring-1 ring-pelo ring-inset">
+                <dt className="text-tenue">herramienta</dt>
+                <dd className="m-0 break-all">{llamada.nombre}</dd>
+                <dt className="text-tenue">argumentos</dt>
+                <dd className="m-0 break-all">{argumentosLegibles(llamada.argumentos)}</dd>
+                <dt className="text-tenue">resultado</dt>
+                <dd className={`m-0 break-all ${llamada.ok ? "" : "text-brasa"}`}>
+                  {llamada.resumen}
+                </dd>
+              </dl>
+            )}
+          </>
         )}
       </span>
     </li>

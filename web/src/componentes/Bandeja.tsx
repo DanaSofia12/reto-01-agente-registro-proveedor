@@ -59,7 +59,7 @@ export function Bandeja({
           >
             <Avatar cliente={caso.cliente} estado={estado} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13.5px] font-medium leading-tight">
+              <span className="block text-[13.5px] font-medium leading-tight [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
                 {caso.cliente}
               </span>
               <span

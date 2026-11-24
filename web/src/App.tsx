@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  type CorreoRecibido,
   enviarMensaje,
   obtenerArtefactos,
   obtenerCasos,
@@ -13,7 +14,7 @@ import { Bandeja, type EstadoPorCaso } from "./componentes/Bandeja.tsx"
 import { BloqueConfirmacion } from "./componentes/BloqueConfirmacion.tsx"
 import { EstadoVacio } from "./componentes/EstadoVacio.tsx"
 import { Expediente } from "./componentes/Expediente.tsx"
-import { type Correo, HojaCorreo } from "./componentes/HojaCorreo.tsx"
+import { HojaCorreo } from "./componentes/HojaCorreo.tsx"
 import { LibroPasos } from "./componentes/LibroPasos.tsx"
 import { fechaLarga, marcarCaso } from "./lenguaje.ts"
 
@@ -56,18 +57,6 @@ function Texto({ children }: { children: string }) {
   )
 }
 
-/** El correo del cliente, extraído del resultado de la herramienta que lo leyó. */
-function correoDe(llamadas: readonly RegistroLlamada[]): Correo | null {
-  for (let i = llamadas.length - 1; i >= 0; i--) {
-    const l = llamadas[i]
-    if (l?.nombre !== "proveedor_leer_solicitud" || !l.ok) continue
-    if (typeof l.resultado !== "object" || l.resultado === null) continue
-    const correo = (l.resultado as { correo?: Correo }).correo
-    if (correo !== undefined) return correo
-  }
-  return null
-}
-
 export function App() {
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [borrador, setBorrador] = useState("")
@@ -104,9 +93,12 @@ export function App() {
     return mapa
   }, [casos, turnos])
 
-  const clienteActual = casos.find((c) => c.caso === casoActual)?.cliente ?? null
+  const solicitudActual = casos.find((c) => c.caso === casoActual) ?? null
+  const clienteActual = solicitudActual?.cliente ?? null
   const estadoActual: EstadoSolicitud = estados.get(casoActual ?? "")?.estado ?? "sin_revisar"
-  const correo = correoDe(todasLasLlamadas)
+  const correoActual: CorreoRecibido | null = solicitudActual?.correo ?? null
+  /** ¿Ya se le pidió algo al agente sobre esta solicitud? */
+  const yaRevisada = turnos.some((t) => t.caso === casoActual)
 
   const enviar = useCallback(
     async (texto: string, confirmacion = false) => {
@@ -170,7 +162,13 @@ export function App() {
     [pensando, sessionId, casoActual],
   )
 
-  const revisar = useCallback(
+  /** Elegir una solicitud solo abre el correo. El agente no se dispara solo. */
+  const abrir = useCallback((caso: ResumenCaso) => {
+    setCasoActual(caso.caso)
+    setArtefactos([])
+  }, [])
+
+  const pedirRevision = useCallback(
     (caso: ResumenCaso) => {
       setCasoActual(caso.caso)
       enviar(
@@ -180,7 +178,7 @@ export function App() {
     [enviar],
   )
 
-  const vacio = turnos.length === 0
+  const vacio = turnos.length === 0 && casoActual === null
   const llamadasEnCurso = turnos[turnos.length - 1]?.llamadas ?? []
 
   return (
@@ -204,20 +202,29 @@ export function App() {
             estados={estados}
             casoActual={casoActual}
             deshabilitado={pensando}
-            onElegir={revisar}
+            onElegir={abrir}
             fechaReferencia={salud === null ? null : fechaLarga(salud.fechaReferencia, false)}
           />
         </div>
 
         <main className="flex min-h-0 flex-col bg-nube">
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
-            <div className="mx-auto flex max-w-[39rem] flex-col gap-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-8">
+            <div
+              className={`mx-auto flex w-full max-w-[39rem] flex-col gap-5 ${vacio ? "my-auto" : ""}`}
+            >
               {vacio && !pensando && (
-                <EstadoVacio casos={casos} deshabilitado={pensando} onElegir={revisar} />
+                <EstadoVacio casos={casos} deshabilitado={pensando} onElegir={abrir} />
               )}
 
-              {correo !== null && clienteActual !== null && (
-                <HojaCorreo correo={correo} cliente={clienteActual} estado={estadoActual} />
+              {correoActual !== null && clienteActual !== null && solicitudActual !== null && (
+                <HojaCorreo
+                  correo={correoActual}
+                  cliente={clienteActual}
+                  estado={estadoActual}
+                  onRevisar={
+                    yaRevisada || pensando ? undefined : () => pedirRevision(solicitudActual)
+                  }
+                />
               )}
 
               {turnos.map((turno) =>

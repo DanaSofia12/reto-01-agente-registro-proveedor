@@ -33,12 +33,23 @@ export interface Salud {
   maxIteracionesTurno: number
 }
 
+export interface CorreoRecibido {
+  de: string
+  para: string
+  asunto: string
+  fecha: string
+  cuerpo: string
+  adjuntos: string[]
+}
+
 export interface ResumenCaso {
   caso: string
   cliente: string
   pais: string
   formato: string
   asunto: string
+  /** `null` solo si la solicitud del fixture está corrupta. */
+  correo: CorreoRecibido | null
 }
 
 async function pedir<T>(ruta: string, init?: RequestInit): Promise<T> {

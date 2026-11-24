@@ -164,15 +164,25 @@ function getCasos(): Response {
   const casos = casosDisponibles(RAIZ).map((caso) => {
     try {
       const solicitud = leerSolicitud(RAIZ, caso)
+      // El correo entero viaja a la bandeja: la analista lo lee antes de pedirle
+      // nada al agente, igual que abriría el correo real.
       return {
         caso,
         cliente: solicitud.cliente,
         pais: solicitud.pais,
         formato: solicitud.formato,
         asunto: solicitud.asunto,
+        correo: {
+          de: solicitud.de,
+          para: solicitud.para,
+          asunto: solicitud.asunto,
+          fecha: solicitud.fecha,
+          cuerpo: solicitud.cuerpo,
+          adjuntos: solicitud.adjuntos,
+        },
       }
     } catch {
-      return { caso, cliente: caso, pais: "—", formato: "—", asunto: "" }
+      return { caso, cliente: caso, pais: "—", formato: "—", asunto: "", correo: null }
     }
   })
   return json({ casos })
